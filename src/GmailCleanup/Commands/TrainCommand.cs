@@ -1,0 +1,78 @@
+using Spectre.Console;
+using Spectre.Console.Cli;
+using GmailCleanup.Services;
+
+namespace GmailCleanup.Commands;
+
+public class TrainCommand : AsyncCommand
+{
+    public override async Task<int> ExecuteAsync(CommandContext context)
+    {
+        try
+        {
+            AnsiConsole.MarkupLine("[bold blue]=== Train Email Classifier ===[/]");
+            AnsiConsole.WriteLine();
+
+            var appSettings = CommandHelper.LoadSettings();
+            using var dbContext = CommandHelper.CreateDbContext();
+            await dbContext.Database.EnsureCreatedAsync();
+
+            var trainer = new ModelTrainerService(dbContext);
+            var modelPath = ModelTrainerService.GetDefaultModelPath();
+
+            if (File.Exists(modelPath))
+            {
+                var fileInfo = new FileInfo(modelPath);
+                AnsiConsole.MarkupLine($"[yellow]Existing model found ({fileInfo.Length / 1024.0 / 1024.0:F1} MB, last trained {fileInfo.LastWriteTime:g})[/]");
+                if (!AnsiConsole.Confirm("Retrain and overwrite?", defaultValue: true))
+                    return 0;
+            }
+
+            var result = await trainer.TrainAsync(
+                modelPath,
+                onStatus: msg => AnsiConsole.MarkupLine($"  {Markup.Escape(msg)}"),
+                CancellationToken.None);
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[green]✓ Training complete![/]");
+            AnsiConsole.WriteLine();
+
+            // Summary table
+            var table = new Table();
+            table.AddColumn("[bold]Metric[/]");
+            table.AddColumn("[bold]Value[/]");
+            table.AddRow("Training samples", $"{result.TrainingSamples:N0}");
+            table.AddRow("Categories", string.Join(", ", result.Categories));
+            table.AddRow("Accuracy", $"{result.Accuracy:P1}");
+            table.AddRow("Log-loss", $"{result.LogLoss:F3}");
+            table.AddRow("Model size", $"{result.ModelSizeBytes / 1024.0 / 1024.0:F1} MB");
+            table.AddRow("Model path", result.ModelPath);
+            AnsiConsole.Write(table);
+
+            // Per-class metrics
+            AnsiConsole.WriteLine();
+            var classTable = new Table();
+            classTable.AddColumn("[bold]Category[/]");
+            classTable.AddColumn("[bold]Precision[/]", c => c.RightAligned());
+            classTable.AddColumn("[bold]Recall[/]", c => c.RightAligned());
+            classTable.AddColumn("[bold]F1[/]", c => c.RightAligned());
+
+            foreach (var (name, metrics) in result.PerClassMetrics.OrderBy(x => x.Key))
+            {
+                classTable.AddRow(name, $"{metrics.Precision:P1}", $"{metrics.Recall:P1}", $"{metrics.F1:P1}");
+            }
+
+            AnsiConsole.Write(classTable);
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[dim]Run 'gmail-cleanup classify' to classify remaining emails using the trained model.[/]");
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error during training: {Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
+    }
+}

@@ -1,0 +1,155 @@
+{
+  "rules": [
+    {
+      "name": "list-unsubscribe-header",
+      "description": "Emails with List-Unsubscribe header are marketing/newsletters",
+      "type": "header",
+      "condition": {
+        "header": "List-Unsubscribe",
+        "present": true
+      },
+      "category": "Newsletter",
+      "priority": 10
+    },
+    {
+      "name": "gmail-promotions",
+      "description": "Gmail categorized as Promotions",
+      "type": "gmail-category",
+      "condition": {
+        "category": "CATEGORY_PROMOTIONS"
+      },
+      "category": "Marketing",
+      "priority": 20
+    },
+    {
+      "name": "gmail-social",
+      "description": "Gmail categorized as Social",
+      "type": "gmail-category",
+      "condition": {
+        "category": "CATEGORY_SOCIAL"
+      },
+      "category": "Social",
+      "priority": 20
+    },
+    {
+      "name": "gmail-updates",
+      "description": "Gmail categorized as Updates",
+      "type": "gmail-category",
+      "condition": {
+        "category": "CATEGORY_UPDATES"
+      },
+      "category": "Notification",
+      "priority": 25
+    },
+    {
+      "name": "gmail-forums",
+      "description": "Gmail categorized as Forums",
+      "type": "gmail-category",
+      "condition": {
+        "category": "CATEGORY_FORUMS"
+      },
+      "category": "Forum",
+      "priority": 25
+    },
+    {
+      "name": "marketing-domains",
+      "description": "Known marketing/bulk email sender domains",
+      "type": "sender-domain",
+      "condition": {
+        "domains": [
+          "mailchimp.com", "mail.mailchimp.com",
+          "sendgrid.net", "em.sendgrid.net",
+          "constantcontact.com",
+          "mailgun.org", "mailgun.net",
+          "amazonses.com",
+          "hubspot.com", "hubspotemail.net",
+          "marketo.com",
+          "salesforce.com",
+          "pardot.com",
+          "intercom-mail.com", "intercom.io",
+          "drip.com",
+          "convertkit.com",
+          "activecampaign.com",
+          "klaviyo.com",
+          "braze.com",
+          "iterable.com",
+          "customer.io",
+          "postmarkapp.com",
+          "mandrillapp.com",
+          "cmail1.com", "cmail2.com", "cmail19.com", "cmail20.com",
+          "createsend.com",
+          "mcsv.net",
+          "list-manage.com",
+          "e.]]]mail.com"
+        ]
+      },
+      "category": "Marketing",
+      "priority": 30
+    },
+    {
+      "name": "noreply-senders",
+      "description": "Automated no-reply sender addresses",
+      "type": "sender-pattern",
+      "condition": {
+        "patterns": [
+          "^no-?reply@",
+          "^noreply@",
+          "^do-?not-?reply@",
+          "^mailer-daemon@",
+          "^notifications?@",
+          "^alerts?@",
+          "^updates?@",
+          "^info@",
+          "^newsletter@",
+          "^marketing@",
+          "^digest@",
+          "^weekly@",
+          "^daily@"
+        ]
+      },
+      "category": "Automated",
+      "priority": 40
+    },
+    {
+      "name": "subject-newsletter-patterns",
+      "description": "Subject lines indicating newsletters or digests",
+      "type": "subject-pattern",
+      "condition": {
+        "patterns": [
+          "weekly (digest|recap|update|summary|roundup|newsletter)",
+          "daily (digest|recap|update|summary|roundup)",
+          "monthly (digest|recap|update|summary|roundup|newsletter)",
+          "your .* (digest|recap|newsletter)",
+          "^\\[newsletter\\]",
+          "newsletter:?\\s",
+          "unsubscribe"
+        ]
+      },
+      "category": "Newsletter",
+      "priority": 50
+    },
+    {
+      "name": "subject-notification-patterns",
+      "description": "Subject lines indicating automated notifications",
+      "type": "subject-pattern",
+      "condition": {
+        "patterns": [
+          "your (order|shipment|delivery|package) (has been|was|is)",
+          "order (confirmation|shipped|delivered|cancelled)",
+          "payment (received|processed|confirmed|failed)",
+          "receipt for your",
+          "invoice #",
+          "your .* has been (updated|changed|modified)",
+          "password (reset|changed|updated)",
+          "sign-?in (alert|notification)",
+          "security (alert|notification|code)",
+          "verification code",
+          "two-factor",
+          "2fa"
+        ]
+      },
+      "category": "Notification",
+      "priority": 50
+    }
+  ]
+}
