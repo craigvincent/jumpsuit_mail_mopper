@@ -2,9 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- Allow test naming conventions (underscores) and suppress test-irrelevant warnings -->
+    <NoWarn>$(NoWarn);CA1707;CA1816</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

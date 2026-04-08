@@ -1,8 +1,8 @@
-using Spectre.Console;
-using Spectre.Console.Cli;
-using GmailCleanup.Data;
+using System.Globalization;
 using GmailCleanup.Services;
 using Microsoft.EntityFrameworkCore;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace GmailCleanup.Commands;
 
@@ -13,7 +13,7 @@ public class StatsCommand : AsyncCommand
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Statistics[/]");
-            
+
             using var dbContext = CommandHelper.CreateDbContext();
             await dbContext.Database.EnsureCreatedAsync();
 
@@ -29,11 +29,11 @@ public class StatsCommand : AsyncCommand
             statsTable.AddColumn("[bold]Metric[/]");
             statsTable.AddColumn("[bold]Value[/]", col => col.RightAligned());
 
-            statsTable.AddRow("Total Emails", stats.TotalEmails.ToString());
-            statsTable.AddRow("Classified", stats.Classified.ToString());
-            statsTable.AddRow("Unclassified", stats.Unclassified.ToString());
-            statsTable.AddRow("Approved for Trash", stats.ApprovedForTrash.ToString());
-            statsTable.AddRow("Trashed", stats.Trashed.ToString());
+            statsTable.AddRow("Total Emails", stats.TotalEmails.ToString(CultureInfo.InvariantCulture));
+            statsTable.AddRow("Classified", stats.Classified.ToString(CultureInfo.InvariantCulture));
+            statsTable.AddRow("Unclassified", stats.Unclassified.ToString(CultureInfo.InvariantCulture));
+            statsTable.AddRow("Approved for Trash", stats.ApprovedForTrash.ToString(CultureInfo.InvariantCulture));
+            statsTable.AddRow("Trashed", stats.Trashed.ToString(CultureInfo.InvariantCulture));
             statsTable.AddRow("Total Size", $"{stats.TotalSize / 1_048_576.0:F2} MB");
 
             AnsiConsole.Write(statsTable);
@@ -53,7 +53,7 @@ public class StatsCommand : AsyncCommand
                 var percentage = total > 0 ? (category.Count * 100.0 / total) : 0;
                 categoryTable.AddRow(
                     category.Category.ToString(),
-                    category.Count.ToString(),
+                    category.Count.ToString(CultureInfo.InvariantCulture),
                     $"{percentage:F1}%",
                     $"{category.TotalSize / 1_048_576.0:F2} MB"
                 );
@@ -71,7 +71,7 @@ public class StatsCommand : AsyncCommand
                 .Take(10)
                 .ToListAsync(CancellationToken.None);
 
-            if (topSenders.Any())
+            if (topSenders.Count > 0)
             {
                 var sendersTable = new Table();
                 sendersTable.Title = new TableTitle("[bold]Top 10 Senders[/]");
@@ -80,7 +80,7 @@ public class StatsCommand : AsyncCommand
 
                 foreach (var sender in topSenders)
                 {
-                    sendersTable.AddRow(Markup.Escape(sender.Sender ?? "Unknown"), sender.Count.ToString());
+                    sendersTable.AddRow(Markup.Escape(sender.Sender ?? "Unknown"), sender.Count.ToString(CultureInfo.InvariantCulture));
                 }
 
                 AnsiConsole.Write(sendersTable);

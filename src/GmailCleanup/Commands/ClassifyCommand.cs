@@ -1,9 +1,9 @@
-using Spectre.Console;
-using Spectre.Console.Cli;
-using GmailCleanup.Data;
+using System.ComponentModel;
+using System.Globalization;
 using GmailCleanup.Services;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace GmailCleanup.Commands;
 
@@ -21,7 +21,7 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
         try
         {
             Console.WriteLine("=== Email Classification ===");
-            
+
             var appSettings = CommandHelper.LoadSettings();
             using var dbContext = CommandHelper.CreateDbContext();
             await dbContext.Database.EnsureCreatedAsync();
@@ -70,11 +70,11 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
             foreach (var item in categoryBreakdown)
             {
                 var percentage = total > 0 ? (item.Count * 100.0 / total) : 0;
-                table.AddRow(item.Category.ToString(), item.Count.ToString(), $"{percentage:F1}%");
+                table.AddRow(item.Category.ToString(), item.Count.ToString(CultureInfo.InvariantCulture), $"{percentage:F1}%");
             }
 
             AnsiConsole.Write(table);
-            
+
             return 0;
         }
         catch (Exception ex)

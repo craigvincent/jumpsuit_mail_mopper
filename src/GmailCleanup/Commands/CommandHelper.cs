@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Configuration;
 using GmailCleanup.Config;
 using GmailCleanup.Data;
+using Microsoft.Extensions.Configuration;
 
 namespace GmailCleanup.Commands;
 
@@ -21,7 +21,7 @@ internal static class CommandHelper
             .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true)
             .AddEnvironmentVariables("GMAIL_CLEANUP_")
             .Build();
-        
+
         var settings = new AppSettings();
         config.Bind(settings);
 

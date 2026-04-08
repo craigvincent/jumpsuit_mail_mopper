@@ -1,5 +1,5 @@
-﻿using Spectre.Console.Cli;
 using GmailCleanup.Commands;
+using Spectre.Console.Cli;
 
 var app = new CommandApp();
 

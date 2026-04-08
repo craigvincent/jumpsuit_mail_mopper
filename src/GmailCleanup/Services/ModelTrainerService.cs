@@ -1,8 +1,7 @@
-using Microsoft.ML;
-using Microsoft.ML.Data;
 using GmailCleanup.Data;
 using GmailCleanup.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.ML;
 
 namespace GmailCleanup.Services;
 

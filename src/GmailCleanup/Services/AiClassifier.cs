@@ -1,6 +1,6 @@
-using Microsoft.ML;
 using GmailCleanup.Config;
 using GmailCleanup.Models;
+using Microsoft.ML;
 
 namespace GmailCleanup.Services;
 
@@ -109,6 +109,8 @@ public class MlClassifier : IDisposable
             _predictionEngine.Dispose();
             _disposed = true;
         }
+
+        GC.SuppressFinalize(this);
     }
 }
 

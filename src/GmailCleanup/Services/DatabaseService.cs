@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
 using GmailCleanup.Data;
 using GmailCleanup.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace GmailCleanup.Services;
 
@@ -34,7 +34,7 @@ public class DatabaseService
     public async Task<EmailStats> GetStatsAsync(CancellationToken ct)
     {
         var totalEmails = await _db.Emails.CountAsync(ct);
-        
+
         var classified = await _db.Classifications
             .Select(c => c.MessageId)
             .Distinct()

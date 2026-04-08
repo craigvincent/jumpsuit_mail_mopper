@@ -1,10 +1,9 @@
-using Spectre.Console;
-using Spectre.Console.Cli;
-using GmailCleanup.Data;
+using System.ComponentModel;
 using GmailCleanup.Services;
 using GmailCleanup.Tui;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace GmailCleanup.Commands;
 
@@ -13,7 +12,7 @@ public class RunSettings : CommandSettings
     [CommandOption("--skip-ml")]
     [Description("Skip ML classification, use rules only")]
     public bool SkipMl { get; set; }
-    
+
     [CommandOption("--dry-run")]
     [Description("Preview what would be trashed without actually trashing")]
     public bool DryRun { get; set; }
@@ -26,7 +25,7 @@ public class RunCommand : AsyncCommand<RunSettings>
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Gmail Cleanup - Full Pipeline[/]");
-            
+
             var appSettings = CommandHelper.LoadSettings();
             var authService = new GmailAuthService(appSettings);
             using var dbContext = CommandHelper.CreateDbContext();
@@ -51,7 +50,8 @@ public class RunCommand : AsyncCommand<RunSettings>
                     var task = ctx.AddTask("[bold green]Fetching emails[/]");
                     var progress = new Progress<(int fetched, int total)>(p =>
                     {
-                        if (p.total > 0) task.Value = (double)p.fetched / p.total * 100;
+                        if (p.total > 0)
+                            task.Value = (double)p.fetched / p.total * 100;
                     });
                     totalFetched = await fetchService.FetchIncrementalAsync(progress, CancellationToken.None);
                 });
@@ -110,7 +110,7 @@ public class RunCommand : AsyncCommand<RunSettings>
 
             // Step 5: Execute
             AnsiConsole.MarkupLine("\n[bold]Step 5: Executing Actions[/]");
-            
+
             var approvedCount = await dbContext.Classifications
                 .Where(c => c.ReviewDecision == Models.ReviewDecision.ApproveTrash)
                 .CountAsync(CancellationToken.None);
@@ -145,7 +145,8 @@ public class RunCommand : AsyncCommand<RunSettings>
                     var task = ctx.AddTask("[bold green]Trashing emails[/]");
                     var progress = new Progress<(int processed, int total)>(p =>
                     {
-                        if (p.total > 0) task.Value = (double)p.processed / p.total * 100;
+                        if (p.total > 0)
+                            task.Value = (double)p.processed / p.total * 100;
                     });
                     actionResult = await actionService.TrashApprovedAsync(false, progress, CancellationToken.None);
                 });

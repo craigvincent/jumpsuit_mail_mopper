@@ -26,11 +26,11 @@ public class AppDbContext : DbContext
         _dbPath = "unused"; // path comes from options
     }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        if (!options.IsConfigured)
+        if (!optionsBuilder.IsConfigured)
         {
-            options.UseSqlite($"Data Source={_dbPath}");
+            optionsBuilder.UseSqlite($"Data Source={_dbPath}");
         }
     }
 

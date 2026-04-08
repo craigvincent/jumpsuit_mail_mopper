@@ -1,7 +1,6 @@
+using GmailCleanup.Services;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using GmailCleanup.Config;
-using GmailCleanup.Services;
 
 namespace GmailCleanup.Commands;
 
@@ -10,10 +9,10 @@ public class AuthCommand : AsyncCommand
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         var appSettings = CommandHelper.LoadSettings();
-        
+
         AnsiConsole.MarkupLine("[bold blue]Gmail Authentication Setup[/]");
         AnsiConsole.MarkupLine($"Looking for credentials at: [yellow]{appSettings.Gmail.CredentialsPath}[/]");
-        
+
         if (!File.Exists(appSettings.Gmail.CredentialsPath))
         {
             AnsiConsole.MarkupLine("[red]credentials.json not found![/]");
@@ -25,7 +24,7 @@ public class AuthCommand : AsyncCommand
         }
 
         var authService = new GmailAuthService(appSettings);
-        
+
         await AnsiConsole.Status()
             .StartAsync("Authenticating with Gmail...", async ctx =>
             {
@@ -34,7 +33,7 @@ public class AuthCommand : AsyncCommand
                 AnsiConsole.MarkupLine($"[green]✓[/] Authenticated as: [bold]{profile.EmailAddress}[/]");
                 AnsiConsole.MarkupLine($"[green]✓[/] Total messages: [bold]{profile.MessagesTotal}[/]");
             });
-        
+
         return 0;
     }
 }

@@ -1,9 +1,8 @@
-using Spectre.Console;
-using Spectre.Console.Cli;
-using GmailCleanup.Data;
+using System.ComponentModel;
 using GmailCleanup.Services;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace GmailCleanup.Commands;
 
@@ -21,11 +20,11 @@ public class FetchCommand : AsyncCommand<FetchSettings>
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Gmail Email Fetch[/]");
-            
+
             var appSettings = CommandHelper.LoadSettings();
             var authService = new GmailAuthService(appSettings);
             using var dbContext = CommandHelper.CreateDbContext();
-            
+
             // Authenticate
             var gmail = await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
@@ -43,16 +42,16 @@ public class FetchCommand : AsyncCommand<FetchSettings>
             {
                 var lastSync = await dbContext.SyncStates
                     .FirstOrDefaultAsync(s => s.Key == "default", CancellationToken.None);
-                
+
                 isFullFetch = lastSync?.LastSyncAt == null;
             }
 
-            AnsiConsole.MarkupLine(isFullFetch 
-                ? "[yellow]Performing full fetch...[/]" 
+            AnsiConsole.MarkupLine(isFullFetch
+                ? "[yellow]Performing full fetch...[/]"
                 : "[yellow]Performing incremental fetch...[/]");
 
             var startTime = DateTime.UtcNow;
-            
+
             // Fetch with progress
             int totalFetched = 0;
             await AnsiConsole.Progress()
@@ -61,7 +60,8 @@ public class FetchCommand : AsyncCommand<FetchSettings>
                     var task = ctx.AddTask("[bold green]Fetching emails[/]");
                     var progress = new Progress<(int fetched, int total)>(p =>
                     {
-                        if (p.total > 0) task.Value = (double)p.fetched / p.total * 100;
+                        if (p.total > 0)
+                            task.Value = (double)p.fetched / p.total * 100;
                     });
                     totalFetched = isFullFetch
                         ? await fetchService.FetchAllAsync(progress, CancellationToken.None)
