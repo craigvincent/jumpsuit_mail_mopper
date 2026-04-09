@@ -19,9 +19,14 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
+# Create data directory writable by the non-root user (UID 1654)
+COPY --chown=$APP_UID:$APP_UID --from=build /src/Directory.Build.props /home/app/.local/share/GmailCleanup/.keep
 # Auth callback port for OAuth2 loopback flow (set via GMAIL_CLEANUP_Gmail__AuthCallbackPort)
 EXPOSE 8484
 ENV GMAIL_CLEANUP_Gmail__AuthCallbackPort=8484
+# Ensure LocalApplicationData resolves correctly for the non-root user
+ENV HOME=/home/app
+ENV XDG_DATA_HOME=/home/app/.local/share
 
 USER $APP_UID
 ENTRYPOINT ["dotnet", "GmailCleanup.dll"]
