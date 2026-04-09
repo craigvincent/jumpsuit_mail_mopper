@@ -1,4 +1,5 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG VERSION=0.0.0-local
 WORKDIR /src
 
 COPY GmailCleanup.slnx Directory.Build.props ./
@@ -10,6 +11,7 @@ COPY . .
 RUN dotnet publish src/GmailCleanup/GmailCleanup.csproj \
     --configuration Release \
     --no-restore \
+    -p:Version=${VERSION} \
     -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/runtime:10.0-noble-chiseled AS runtime

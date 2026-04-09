@@ -27,10 +27,8 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
-          SHORT_SHA=${GITHUB_SHA::7}
+          VERSION="$(date -u +'%Y.%-m').${{ github.run_number }}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "version_sha=${VERSION}+${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -46,7 +44,6 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=${{ steps.version.outputs.version_sha }}
             type=sha,prefix=
             type=raw,value=latest
 
@@ -61,6 +58,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
