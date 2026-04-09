@@ -29,12 +29,29 @@ public class GmailAuthService
         using (var stream = new FileStream(_settings.Gmail.CredentialsPath, FileMode.Open, FileAccess.Read))
         {
             var tokenStore = new FileDataStore(_settings.Gmail.TokenPath, fullPath: true);
-            credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                (await GoogleClientSecrets.FromStreamAsync(stream, ct)).Secrets,
-                _settings.Gmail.Scopes,
-                "user",
-                ct,
-                tokenStore);
+            var secrets = (await GoogleClientSecrets.FromStreamAsync(stream, ct)).Secrets;
+
+            var authCallbackPort = _settings.Gmail.AuthCallbackPort;
+            if (authCallbackPort > 0)
+            {
+                var receiver = new LoopbackCodeReceiver(authCallbackPort);
+                credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                    secrets,
+                    _settings.Gmail.Scopes,
+                    "user",
+                    ct,
+                    tokenStore,
+                    receiver);
+            }
+            else
+            {
+                credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                    secrets,
+                    _settings.Gmail.Scopes,
+                    "user",
+                    ct,
+                    tokenStore);
+            }
         }
 
         var service = new GmailService(new BaseClientService.Initializer()

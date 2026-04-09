@@ -73,11 +73,11 @@ public class DatabaseService
             .Include(c => c.Email)
             .GroupBy(c => c.Category)
             .Select(g => new CategorySummary(
-                Category: g.Key,
-                Count: g.Count(),
-                TotalSize: g.Sum(c => c.Email!.SizeEstimate),
-                ApprovedCount: g.Count(c => c.ReviewDecision == ReviewDecision.ApproveTrash),
-                TopSender: g
+                g.Key,
+                g.Count(),
+                g.Sum(c => c.Email!.SizeEstimate),
+                g.Count(c => c.ReviewDecision == ReviewDecision.ApproveTrash),
+                g
                     .GroupBy(c => c.Email!.From)
                     .OrderByDescending(sg => sg.Count())
                     .Select(sg => sg.Key)
