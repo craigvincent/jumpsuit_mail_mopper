@@ -1,6 +1,6 @@
+using GmailCleanup.Services;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using GmailCleanup.Services;
 
 namespace GmailCleanup.Commands;
 

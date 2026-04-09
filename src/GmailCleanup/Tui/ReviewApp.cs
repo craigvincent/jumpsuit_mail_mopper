@@ -1,7 +1,8 @@
-using Microsoft.EntityFrameworkCore;
-using Spectre.Console;
+using System.Globalization;
 using GmailCleanup.Data;
 using GmailCleanup.Models;
+using Microsoft.EntityFrameworkCore;
+using Spectre.Console;
 
 namespace GmailCleanup.Tui;
 
@@ -115,9 +116,12 @@ public class ReviewApp
 
     private static ReviewDecision ComputeGroupDecision(IGrouping<ClassificationCategory, Classification> g)
     {
-        if (g.All(c => c.ReviewDecision == ReviewDecision.ApproveTrash)) return ReviewDecision.ApproveTrash;
-        if (g.All(c => c.ReviewDecision == ReviewDecision.Keep)) return ReviewDecision.Keep;
-        if (g.All(c => c.ReviewDecision == ReviewDecision.Whitelisted)) return ReviewDecision.Whitelisted;
+        if (g.All(c => c.ReviewDecision == ReviewDecision.ApproveTrash))
+            return ReviewDecision.ApproveTrash;
+        if (g.All(c => c.ReviewDecision == ReviewDecision.Keep))
+            return ReviewDecision.Keep;
+        if (g.All(c => c.ReviewDecision == ReviewDecision.Whitelisted))
+            return ReviewDecision.Whitelisted;
         return ReviewDecision.Pending;
     }
 
@@ -175,12 +179,12 @@ public class ReviewApp
             var decided = g.Classifications.Count(c => c.ReviewDecision != ReviewDecision.Pending);
             var progressText = decided == count
                 ? g.Decision switch
-                  {
-                      ReviewDecision.ApproveTrash => "[red]✗ Trash[/]",
-                      ReviewDecision.Keep => "[green]✓ Keep[/]",
-                      ReviewDecision.Whitelisted => "[cyan]✓ Whitelisted[/]",
-                      _ => "[green]✓ Done[/]"
-                  }
+                {
+                    ReviewDecision.ApproveTrash => "[red]✗ Trash[/]",
+                    ReviewDecision.Keep => "[green]✓ Keep[/]",
+                    ReviewDecision.Whitelisted => "[cyan]✓ Whitelisted[/]",
+                    _ => "[green]✓ Done[/]"
+                }
                 : decided > 0
                     ? $"[yellow]{decided}/{count} reviewed[/]"
                     : "[dim]Not started[/]";
@@ -188,8 +192,8 @@ public class ReviewApp
             table.AddRow(
                 $"[bold]{i + 1}[/]",
                 $"[bold]{g.Category}[/]",
-                count.ToString("N0"),
-                senderCount.ToString("N0"),
+                count.ToString("N0", CultureInfo.InvariantCulture),
+                senderCount.ToString("N0", CultureInfo.InvariantCulture),
                 size,
                 Markup.Escape(topDomain.Length > 25 ? topDomain[..22] + "..." : topDomain),
                 progressText);
@@ -289,8 +293,10 @@ public class ReviewApp
             int totalFiltered = filteredSenders.Count;
             int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalFiltered / PageSize));
 
-            if (currentPage >= totalPages) currentPage = totalPages - 1;
-            if (currentPage < 0) currentPage = 0;
+            if (currentPage >= totalPages)
+                currentPage = totalPages - 1;
+            if (currentPage < 0)
+                currentPage = 0;
 
             int startIdx = currentPage * PageSize;
             int endIdx = Math.Min(startIdx + PageSize, totalFiltered);
@@ -341,7 +347,7 @@ public class ReviewApp
                     senderTable.AddRow(
                         $"{marker}{displayNum}",
                         Markup.Escape(from),
-                        s.Classifications.Count.ToString("N0"),
+                        s.Classifications.Count.ToString("N0", CultureInfo.InvariantCulture),
                         Markup.Escape(s.Domain),
                         status);
                 }
@@ -354,8 +360,10 @@ public class ReviewApp
             var navHints = new List<string> { "[blue]#[/]=view" };
             navHints.Add("[red]T#[/]=trash");
             navHints.Add("[green]K#[/]=keep");
-            if (currentPage > 0) navHints.Add("[blue]P[/]=prev");
-            if (currentPage < totalPages - 1) navHints.Add("[blue]N[/]=next");
+            if (currentPage > 0)
+                navHints.Add("[blue]P[/]=prev");
+            if (currentPage < totalPages - 1)
+                navHints.Add("[blue]N[/]=next");
             navHints.Add(hidingDecided ? "[blue]H[/]=show all" : "[blue]H[/]=pending only");
             navHints.Add("[cyan]Y[/]=year");
             navHints.Add("[red]TA[/]=trash all");
@@ -365,7 +373,7 @@ public class ReviewApp
             AnsiConsole.MarkupLine($"  [dim]{string.Join(" │ ", navHints)}[/]");
 
             var defaultAction = lastSelectedIndex >= 0 && lastSelectedIndex >= startIdx && lastSelectedIndex < endIdx
-                ? (lastSelectedIndex + 1).ToString() : "";
+                ? (lastSelectedIndex + 1).ToString(CultureInfo.InvariantCulture) : "";
             var defaultHint = defaultAction != "" ? $" (Enter=#{defaultAction})" : "";
             var input = ReadCommand($"[blue]Choice{defaultHint}: [/]", "BHNPY", defaultAction);
 
@@ -377,11 +385,13 @@ public class ReviewApp
             }
             else if (trimmed.Equals("N", StringComparison.OrdinalIgnoreCase))
             {
-                if (currentPage < totalPages - 1) currentPage++;
+                if (currentPage < totalPages - 1)
+                    currentPage++;
             }
             else if (trimmed.Equals("P", StringComparison.OrdinalIgnoreCase))
             {
-                if (currentPage > 0) currentPage--;
+                if (currentPage > 0)
+                    currentPage--;
             }
             else if (trimmed.Equals("H", StringComparison.OrdinalIgnoreCase))
             {
@@ -449,7 +459,7 @@ public class ReviewApp
                      && quickNum >= 1 && quickNum <= totalFiltered)
             {
                 var target = filteredSenders[quickNum - 1];
-                var decision = char.ToUpper(trimmed[0]) == 'T'
+                var decision = char.ToUpper(trimmed[0], CultureInfo.InvariantCulture) == 'T'
                     ? ReviewDecision.ApproveTrash
                     : ReviewDecision.Keep;
 
@@ -517,7 +527,7 @@ public class ReviewApp
 
         foreach (var c in sender.Classifications.OrderByDescending(c => c.Email?.Date).Take(25))
         {
-            var date = c.Email?.Date.ToString("yyyy-MM-dd") ?? "-";
+            var date = c.Email?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
             var subject = c.Email?.Subject ?? "-";
             subject = subject.Length > 70 ? subject[..67] + "..." : subject;
             var size = FormatSize(c.Email?.SizeEstimate ?? 0);
@@ -535,7 +545,7 @@ public class ReviewApp
         AnsiConsole.Markup("[blue]Action: [/]");
         var key = Console.ReadKey(intercept: true);
         Console.WriteLine();
-        var action = char.ToUpper(key.KeyChar);
+        var action = char.ToUpper(key.KeyChar, CultureInfo.InvariantCulture);
 
         if (action == 'T')
         {
@@ -602,7 +612,7 @@ public class ReviewApp
             return "B";
         }
 
-        char c = char.ToUpper(firstKey.KeyChar);
+        char c = char.ToUpper(firstKey.KeyChar, CultureInfo.InvariantCulture);
 
         // Instant single-key actions
         if (instantKeys.Contains(c))
@@ -620,7 +630,7 @@ public class ReviewApp
     private void PromptYearFilter()
     {
         var yearChoices = new List<string> { "All years" };
-        yearChoices.AddRange(_availableYears.Select(y => y.ToString()));
+        yearChoices.AddRange(_availableYears.Select(y => y.ToString(CultureInfo.InvariantCulture)));
         var yearPick = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("Select a year:")
@@ -642,7 +652,8 @@ public class ReviewApp
             .Select(g => new { Year = g.Key, Count = g.Count(), Size = g.Sum(c => c.Email?.SizeEstimate ?? 0) })
             .ToList();
 
-        if (yearBreakdown.Count <= 1) return;
+        if (yearBreakdown.Count <= 1)
+            return;
 
         var yearTable = new Table().Border(TableBorder.Minimal).Expand();
         yearTable.AddColumn("[bold]Year[/]");
@@ -651,22 +662,22 @@ public class ReviewApp
             var highlight = _yearFilter == yb.Year ? "[bold cyan]" : "[dim]";
             yearTable.AddColumn(new TableColumn($"{highlight}{yb.Year}[/]").RightAligned());
         }
-        yearTable.AddRow(
-            new string[] { "[bold]Emails[/]" }
+        var emailsRow = new List<string> { "[bold]Emails[/]" }
                 .Concat(yearBreakdown.Select(yb =>
                 {
                     var highlight = _yearFilter == yb.Year ? "[bold cyan]" : "[dim]";
                     return $"{highlight}{yb.Count:N0}[/]";
                 }))
-                .ToArray());
-        yearTable.AddRow(
-            new string[] { "[bold]Size[/]" }
+                .ToArray();
+        yearTable.AddRow(emailsRow);
+        var sizeRow = new List<string> { "[bold]Size[/]" }
                 .Concat(yearBreakdown.Select(yb =>
                 {
                     var highlight = _yearFilter == yb.Year ? "[bold cyan]" : "[dim]";
                     return $"{highlight}{FormatSize(yb.Size)}[/]";
                 }))
-                .ToArray());
+                .ToArray();
+        yearTable.AddRow(sizeRow);
         AnsiConsole.Write(yearTable);
         AnsiConsole.WriteLine();
     }

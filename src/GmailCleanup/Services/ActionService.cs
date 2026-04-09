@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using GmailCleanup.Config;
 using GmailCleanup.Data;
 using GmailCleanup.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace GmailCleanup.Services;
 
@@ -75,7 +75,7 @@ public class ActionService
             ct.ThrowIfCancellationRequested();
 
             var messageIds = batch.Select(e => e.MessageId).ToList();
-            
+
             try
             {
                 // Batch modify to add TRASH label

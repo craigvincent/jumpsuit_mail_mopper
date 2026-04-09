@@ -1,7 +1,6 @@
+using GmailCleanup.Tui;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using GmailCleanup.Data;
-using GmailCleanup.Tui;
 
 namespace GmailCleanup.Commands;
 
@@ -12,7 +11,7 @@ public class ReviewCommand : AsyncCommand
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Email Review[/]");
-            
+
             var dbContext = CommandHelper.CreateDbContext();
             await using var _ = dbContext;
             await dbContext.Database.EnsureCreatedAsync();

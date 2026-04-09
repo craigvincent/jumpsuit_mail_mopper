@@ -1,9 +1,9 @@
-using Microsoft.EntityFrameworkCore;
-using NSubstitute;
 using GmailCleanup.Config;
 using GmailCleanup.Data;
 using GmailCleanup.Models;
 using GmailCleanup.Services;
+using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace GmailCleanup.Tests;
 
@@ -48,7 +48,9 @@ public class EndToEndTests : IDisposable
     {
         _db.Database.CloseConnection();
         _db.Dispose();
-        try { Directory.Delete(_tempDir, recursive: true); } catch { }
+        try
+        { Directory.Delete(_tempDir, recursive: true); }
+        catch { }
     }
 
     #region Helpers
@@ -63,19 +65,19 @@ public class EndToEndTests : IDisposable
         string gmailCategory = "",
         long size = 5000,
         DateTimeOffset? date = null) => new()
-    {
-        MessageId = id,
-        From = from,
-        FromDomain = fromDomain ?? from.Split('@').LastOrDefault() ?? "unknown",
-        To = "me@gmail.com",
-        Subject = subject,
-        Snippet = snippet,
-        HasListUnsubscribe = hasListUnsubscribe,
-        GmailCategory = gmailCategory,
-        GmailLabels = "",
-        Date = date ?? DateTimeOffset.UtcNow,
-        SizeEstimate = size
-    };
+        {
+            MessageId = id,
+            From = from,
+            FromDomain = fromDomain ?? from.Split('@').LastOrDefault() ?? "unknown",
+            To = "me@gmail.com",
+            Subject = subject,
+            Snippet = snippet,
+            HasListUnsubscribe = hasListUnsubscribe,
+            GmailCategory = gmailCategory,
+            GmailLabels = "",
+            Date = date ?? DateTimeOffset.UtcNow,
+            SizeEstimate = size
+        };
 
     #endregion
 
@@ -198,8 +200,8 @@ public class EndToEndTests : IDisposable
 
         // Gmail API was called with the right message IDs
         await gmailApi.Received(1).BatchModifyAsync(
-            Arg.Is<IList<string>>(ids => ids.Contains("t1") && ids.Contains("t2")),
-            Arg.Is<IList<string>>(labels => labels.Contains("TRASH")),
+            Arg.Is<IList<string>>(ids => ids != null && ids.Contains("t1") && ids.Contains("t2")),
+            Arg.Is<IList<string>?>(labels => labels != null && labels.Contains("TRASH")),
             Arg.Any<IList<string>?>(),
             Arg.Any<CancellationToken>());
 
@@ -276,9 +278,9 @@ public class EndToEndTests : IDisposable
         // Assert: only the correct session's emails untrashed
         Assert.Equal(2, count);
         await gmailApi.Received(1).BatchModifyAsync(
-            Arg.Is<IList<string>>(ids => ids.Contains("u1") && ids.Contains("u2") && !ids.Contains("u3")),
+            Arg.Is<IList<string>>(ids => ids != null && ids.Contains("u1") && ids.Contains("u2") && !ids.Contains("u3")),
             Arg.Any<IList<string>?>(),
-            Arg.Is<IList<string>>(labels => labels.Contains("TRASH")),
+            Arg.Is<IList<string>?>(labels => labels != null && labels.Contains("TRASH")),
             Arg.Any<CancellationToken>());
     }
 
@@ -401,7 +403,8 @@ public class EndToEndTests : IDisposable
             .Returns(callInfo =>
             {
                 callCount++;
-                if (callCount == 2) throw new Exception("API rate limit exceeded");
+                if (callCount == 2)
+                    throw new InvalidOperationException("API rate limit exceeded");
                 return Task.CompletedTask;
             });
 

@@ -139,7 +139,7 @@ public class ClassificationPipeline
             }
             else
             {
-            // Refresh classified IDs; include Unclassified placeholders as "needing ML"
+                // Refresh classified IDs; include Unclassified placeholders as "needing ML"
                 var mlClassifiedIds = new HashSet<string>(
                     await _db.Classifications
                         .Where(c => c.Category != ClassificationCategory.Unclassified)

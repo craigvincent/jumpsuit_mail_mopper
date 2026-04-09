@@ -30,7 +30,9 @@ public class RuleClassifierTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_tempDir, recursive: true); } catch { }
+        try
+        { Directory.Delete(_tempDir, recursive: true); }
+        catch { }
     }
 
     private static EmailRecord MakeEmail(
@@ -39,17 +41,17 @@ public class RuleClassifierTests : IDisposable
         string? subject = null,
         bool hasListUnsubscribe = false,
         string? gmailCategory = null) => new()
-    {
-        MessageId = Guid.NewGuid().ToString(),
-        From = from ?? "someone@example.com",
-        FromDomain = fromDomain ?? "example.com",
-        Subject = subject ?? "Hello",
-        HasListUnsubscribe = hasListUnsubscribe,
-        GmailCategory = gmailCategory ?? "",
-        GmailLabels = "",
-        Date = DateTimeOffset.UtcNow,
-        Snippet = ""
-    };
+        {
+            MessageId = Guid.NewGuid().ToString(),
+            From = from ?? "someone@example.com",
+            FromDomain = fromDomain ?? "example.com",
+            Subject = subject ?? "Hello",
+            HasListUnsubscribe = hasListUnsubscribe,
+            GmailCategory = gmailCategory ?? "",
+            GmailLabels = "",
+            Date = DateTimeOffset.UtcNow,
+            Snippet = ""
+        };
 
     [Fact]
     public void ClassifiesEmailWithListUnsubscribeHeader()

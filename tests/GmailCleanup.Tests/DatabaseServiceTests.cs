@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using GmailCleanup.Data;
 using GmailCleanup.Models;
 using GmailCleanup.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace GmailCleanup.Tests;
 

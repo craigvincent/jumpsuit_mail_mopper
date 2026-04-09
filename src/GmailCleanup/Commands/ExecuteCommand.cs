@@ -1,9 +1,8 @@
-using Spectre.Console;
-using Spectre.Console.Cli;
-using GmailCleanup.Data;
+using System.ComponentModel;
 using GmailCleanup.Services;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace GmailCleanup.Commands;
 
@@ -12,7 +11,7 @@ public class ExecuteSettings : CommandSettings
     [CommandOption("--dry-run")]
     [Description("Preview what would be trashed without actually trashing")]
     public bool DryRun { get; set; }
-    
+
     [CommandOption("--force")]
     [Description("Skip confirmation prompt")]
     public bool Force { get; set; }
@@ -25,7 +24,7 @@ public class ExecuteCommand : AsyncCommand<ExecuteSettings>
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Execute Actions[/]");
-            
+
             var appSettings = CommandHelper.LoadSettings();
             var authService = new GmailAuthService(appSettings);
             using var dbContext = CommandHelper.CreateDbContext();
@@ -80,7 +79,8 @@ public class ExecuteCommand : AsyncCommand<ExecuteSettings>
                     var task = ctx.AddTask("[bold green]Trashing emails[/]");
                     var progress = new Progress<(int processed, int total)>(p =>
                     {
-                        if (p.total > 0) task.Value = (double)p.processed / p.total * 100;
+                        if (p.total > 0)
+                            task.Value = (double)p.processed / p.total * 100;
                     });
                     result = await actionService.TrashApprovedAsync(settings.DryRun, progress, CancellationToken.None);
                 });

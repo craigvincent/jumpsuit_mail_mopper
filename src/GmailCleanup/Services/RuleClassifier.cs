@@ -13,6 +13,12 @@ public record ClassificationResult(
 
 public class RuleClassifier
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private readonly AppSettings _appSettings;
     private List<Rule> _rules = [];
     private readonly Dictionary<string, Regex> _compiledRegexCache = [];
@@ -25,21 +31,15 @@ public class RuleClassifier
     public async Task LoadRulesAsync(CancellationToken ct)
     {
         var rulesPath = _appSettings.Classification.RulesPath;
-        
+
         if (!File.Exists(rulesPath))
         {
             throw new FileNotFoundException($"Rules file not found at {rulesPath}");
         }
 
         var json = await File.ReadAllTextAsync(rulesPath, ct);
-        
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
 
-        var rulesDocument = JsonSerializer.Deserialize<RulesDocument>(json, options)
+        var rulesDocument = JsonSerializer.Deserialize<RulesDocument>(json, JsonOptions)
             ?? throw new InvalidOperationException("Failed to deserialize rules file");
 
         _rules = rulesDocument.Rules
@@ -99,7 +99,7 @@ public class RuleClassifier
             _ => false
         };
 
-    private bool MatchesHeaderRule(EmailRecord email, Rule rule)
+    private static bool MatchesHeaderRule(EmailRecord email, Rule rule)
     {
         var condition = rule.Condition as JsonElement?;
         if (!condition.HasValue)
@@ -120,7 +120,7 @@ public class RuleClassifier
         return false;
     }
 
-    private bool MatchesGmailCategoryRule(EmailRecord email, Rule rule)
+    private static bool MatchesGmailCategoryRule(EmailRecord email, Rule rule)
     {
         var condition = rule.Condition as JsonElement?;
         if (!condition.HasValue)
@@ -136,7 +136,7 @@ public class RuleClassifier
         return false;
     }
 
-    private bool MatchesSenderDomainRule(EmailRecord email, Rule rule)
+    private static bool MatchesSenderDomainRule(EmailRecord email, Rule rule)
     {
         var condition = rule.Condition as JsonElement?;
         if (!condition.HasValue)
@@ -175,7 +175,7 @@ public class RuleClassifier
             if (string.IsNullOrEmpty(email.From))
                 return false;
 
-            return patterns.Any(pattern => MatchesPattern(email.From, pattern));
+            return patterns.Any(pattern => MatchesPattern(email.From, pattern!));
         }
 
         return false;
@@ -197,7 +197,7 @@ public class RuleClassifier
             if (string.IsNullOrEmpty(email.Subject))
                 return false;
 
-            return patterns.Any(pattern => MatchesPattern(email.Subject, pattern));
+            return patterns.Any(pattern => MatchesPattern(email.Subject, pattern!));
         }
 
         return false;

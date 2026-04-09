@@ -4,6 +4,10 @@
 
 # 🧹 Jumpsuit - Mail Mopper
 
+## A .NET 10 CLI tool for Gmail inbox cleanup.
+
+The Janitor's hybrid classification pipeline (rule-based + ML.NET) sorts through the mess, then lets you review everything in an interactive TUI before a single email hits the trash.
+
 > *"Hey. Hey - stop walking. I know you saw me, Scooter.*
 >
 > *You know what I found in your inbox? Sixty thousand emails. Sixty. Thousand. I once found a raccoon living in the west wing air duct and that was less of a mess than this. You've got newsletters from 2014 in there. Coupons that expired during the Obama administration. LinkedIn notifications from people who are probably dead now. It's disgusting.*
@@ -17,8 +21,6 @@
 > - **The Janitor**
 
 ---
-
-A .NET 10 CLI tool for Gmail inbox cleanup. The Janitor's hybrid classification pipeline (rule-based + ML.NET) sorts through the mess, then lets you review everything in an interactive TUI before a single email hits the trash.
 
 ## ✨ What the Mop Does
 

@@ -1,9 +1,9 @@
-using Spectre.Console;
-using Spectre.Console.Cli;
-using GmailCleanup.Data;
+using System.ComponentModel;
+using System.Globalization;
 using GmailCleanup.Services;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace GmailCleanup.Commands;
 
@@ -21,7 +21,7 @@ public class UndoCommand : AsyncCommand<UndoSettings>
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Undo Actions[/]");
-            
+
             using var dbContext = CommandHelper.CreateDbContext();
             await dbContext.Database.EnsureCreatedAsync();
 
@@ -49,9 +49,9 @@ public class UndoCommand : AsyncCommand<UndoSettings>
                 {
                     table.AddRow(
                         session.SessionId,
-                        session.PerformedAt.ToString("yyyy-MM-dd HH:mm"),
+                        session.PerformedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
                         session.Action,
-                        session.Count.ToString());
+                        session.Count.ToString(CultureInfo.InvariantCulture));
                 }
 
                 AnsiConsole.Write(table);
@@ -62,7 +62,7 @@ public class UndoCommand : AsyncCommand<UndoSettings>
             // Undo specific session
             var appSettings = CommandHelper.LoadSettings();
             var authService = new GmailAuthService(appSettings);
-            
+
             var gmail = await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
@@ -101,7 +101,8 @@ public class UndoCommand : AsyncCommand<UndoSettings>
                     var task = ctx.AddTask("[bold green]Restoring emails from trash[/]");
                     var progress = new Progress<(int processed, int total)>(p =>
                     {
-                        if (p.total > 0) task.Value = (double)p.processed / p.total * 100;
+                        if (p.total > 0)
+                            task.Value = (double)p.processed / p.total * 100;
                     });
                     restored = await actionService.UndoSessionAsync(settings.SessionId, progress, CancellationToken.None);
                 });
