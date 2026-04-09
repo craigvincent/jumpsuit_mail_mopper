@@ -1,12 +1,17 @@
+using System.Reflection;
 using GmailCleanup.Commands;
 using Spectre.Console.Cli;
+
+var version = typeof(Program).Assembly
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ?? "0.0.0";
 
 var app = new CommandApp();
 
 app.Configure(config =>
 {
     config.SetApplicationName("gmail-cleanup");
-    config.SetApplicationVersion("1.0.0");
+    config.SetApplicationVersion(version);
 
     config.AddCommand<AuthCommand>("auth")
         .WithDescription("Set up Gmail OAuth2 authentication");

@@ -62,7 +62,7 @@ docker pull ghcr.io/craigvincent/jumpsuit_mail_mopper:latest
 docker run -it --rm \
   -p 8484:8484 \
   -v gmail-data:/home/app/.local/share/GmailCleanup \
-  -v ./credentials.json:/app/credentials.json:ro \
+  -v "$(pwd)/credentials.json:/app/credentials.json:ro" \
   ghcr.io/craigvincent/jumpsuit_mail_mopper auth
 ```
 
@@ -75,7 +75,7 @@ For convenience, set an alias (or substitute the full `docker run` command each 
 ```bash
 alias mopper='docker run -it --rm \
   -v gmail-data:/home/app/.local/share/GmailCleanup \
-  -v ./credentials.json:/app/credentials.json:ro \
+  -v "$(pwd)/credentials.json:/app/credentials.json:ro" \
   ghcr.io/craigvincent/jumpsuit_mail_mopper'
 ```
 
