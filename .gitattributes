@@ -1,16 +1,19 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Auto detect text files and normalise to CRLF (matches .editorconfig)
+* text=auto eol=crlf
 
 # C# source files
-*.cs text diff=csharp
+*.cs text diff=csharp eol=crlf
 
 # Common settings
-*.json text
-*.xml text
-*.md text
-*.yml text
-*.yaml text
-*.slnx text
+*.json text eol=crlf
+*.xml text eol=crlf
+*.md text eol=crlf
+*.yml text eol=crlf
+*.yaml text eol=crlf
+*.slnx text eol=crlf
+
+# Shell scripts always LF
+*.sh text eol=lf
 
 # Windows-specific
 *.cmd text eol=crlf
