@@ -15,6 +15,7 @@ public class GmailSettings
     public int BatchSize { get; set; } = 100;
     public int MaxConcurrentRequests { get; set; } = 5;
     public string[] Scopes { get; set; } = ["https://www.googleapis.com/auth/gmail.modify"];
+    public int AuthCallbackPort { get; set; }
 }
 
 public class MlSettings

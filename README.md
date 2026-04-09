@@ -4,9 +4,9 @@
 
 # 🧹 Jumpsuit - Mail Mopper
 
-## A .NET 10 CLI tool for Gmail inbox cleanup.
+## A CLI tool for Gmail inbox cleanup.
 
-The Janitor's hybrid classification pipeline (rule-based + ML.NET) sorts through the mess, then lets you review everything in an interactive TUI before a single email hits the trash.
+The Janitor's hybrid classification pipeline sorts through the mess — rules handle the obvious junk, a locally-trained classifier catches the rest — then lets you review everything in an interactive terminal UI before a single email hits the trash.
 
 > *"Hey. Hey - stop walking. I know you saw me, Scooter.*
 >
@@ -24,9 +24,9 @@ The Janitor's hybrid classification pipeline (rule-based + ML.NET) sorts through
 
 ## ✨ What the Mop Does
 
-- 📬 **Fetches email metadata** (headers only - I'm not reading your diary, Bambi) into a local SQLite database
-- 🧠 **Hybrid classification**: rule-based engine slaps labels on the obvious junk, then a locally-trained ML.NET classifier handles the rest - like having a smarter mop
-- 🖥️ **Interactive TUI review**: browse by category → sender → email subjects. You get final say, even though I'm always right
+- 📬 **Fetches email metadata** (headers only - I'm not reading your diary, Bambi) into a local database
+- 🧠 **Hybrid classification**: rule-based engine slaps labels on the obvious junk, then a locally-trained classifier handles the rest - like having a smarter mop
+- 🖥️ **Interactive review**: browse by category → sender → email subjects. You get final say, even though I'm always right
 - 🛡️ **Safe**: moves to Trash only (recoverable 30 days). I'm a janitor, not a monster
 - 🔄 **Incremental sync**: only fetches new emails on re-runs. I'm efficient, unlike Dr. Dorian
 - 📋 **Full audit log** with undo support - because *somebody* always panics
@@ -34,34 +34,55 @@ The Janitor's hybrid classification pipeline (rule-based + ML.NET) sorts through
 
 ## 📋 Prerequisites
 
-- .NET 10 SDK
-- Gmail API OAuth2 credentials (from Google Cloud Console)
+- [Docker](https://docs.docker.com/get-docker/)
+- Gmail API credentials (see below)
 
 ## 🔧 Setup
 
-### 1. Google Cloud Console setup
+### 1. Google Cloud Console
 
 Look, even a doctor could do this part:
 
 1. Go to https://console.cloud.google.com/
 2. Create a new project (or select existing)
-3. Enable the Gmail API
-4. Create OAuth 2.0 Client ID → Desktop application
+3. Enable the **Gmail API**
+4. Go to **Credentials** → Create **OAuth 2.0 Client ID** → Desktop application
 5. Download the JSON credentials file
-6. Save as `credentials.json` in the project directory
+6. Save it as `credentials.json` in your working directory
 
-### 2. Build
+### 2. Pull the image
 
+```bash
+docker pull ghcr.io/craigvincent/jumpsuit_mail_mopper:latest
 ```
-dotnet build
+
+### 3. Authenticate
+
+```bash
+docker run -it --rm \
+  -p 8484:8484 \
+  -v gmail-data:/home/app/.local/share/GmailCleanup \
+  -v ./credentials.json:/app/credentials.json:ro \
+  ghcr.io/craigvincent/jumpsuit_mail_mopper auth
 ```
+
+This prints a Google sign-in URL. Open it in your browser, authorise, and the callback is captured through the port mapping. Your token is saved in the `gmail-data` volume for all future commands.
 
 ## 🧹 Usage
 
+For convenience, set an alias (or substitute the full `docker run` command each time):
+
+```bash
+alias mopper='docker run -it --rm \
+  -v gmail-data:/home/app/.local/share/GmailCleanup \
+  -v ./credentials.json:/app/credentials.json:ro \
+  ghcr.io/craigvincent/jumpsuit_mail_mopper'
+```
+
 Show all available commands:
 
-```
-dotnet run --project src/GmailCleanup -- --help
+```bash
+mopper --help
 ```
 
 ### The Full Mopping Procedure
@@ -69,21 +90,21 @@ dotnet run --project src/GmailCleanup -- --help
 Follow these steps in order, sport. I'm not explaining them twice.
 
 ```bash
-dotnet run --project src/GmailCleanup -- auth           # 1. Badge in - authenticate with Gmail
-dotnet run --project src/GmailCleanup -- fetch          # 2. Survey the mess - fetch email metadata
-dotnet run --project src/GmailCleanup -- classify --skip-ml  # 3. First pass with the push broom (rules only)
-dotnet run --project src/GmailCleanup -- train          # 4. Teach the mop new tricks (train ML model)
-dotnet run --project src/GmailCleanup -- classify       # 5. Second pass - now with the smart mop
-dotnet run --project src/GmailCleanup -- review         # 6. YOU look at what I sorted. Don't mess it up
-dotnet run --project src/GmailCleanup -- execute        # 7. Take out the trash. My favorite part
+mopper auth                  # 1. Badge in - authenticate with Gmail
+mopper fetch                 # 2. Survey the mess - fetch email metadata
+mopper classify --skip-ml    # 3. First pass with the push broom (rules only)
+mopper train                 # 4. Teach the mop new tricks (train classifier)
+mopper classify              # 5. Second pass - now with the smart mop
+mopper review                # 6. YOU look at what I sorted. Don't mess it up
+mopper execute               # 7. Take out the trash. My favorite part
 ```
 
 ### Other Janitor Commands
 
 ```bash
-dotnet run --project src/GmailCleanup -- stats          # Admire my work - show statistics
-dotnet run --project src/GmailCleanup -- undo <id>      # Fine. Untrash a session. Quitter
-dotnet run --project src/GmailCleanup -- run            # Full pipeline - let me handle everything
+mopper stats                 # Admire my work - show statistics
+mopper undo <id>             # Fine. Untrash a session. Quitter
+mopper run                   # Full pipeline - let me handle everything
 ```
 
 ### Key Flags
@@ -92,35 +113,25 @@ dotnet run --project src/GmailCleanup -- run            # Full pipeline - let me
 - `--dry-run` - Preview what would happen without making changes. For the nervous types
 - `--full` - Force full fetch instead of incremental. Start over from scratch, like a fresh floor
 
+> **Note**: The `-it` flags are required for the interactive `review` command.
+
 ## 🧠 Classification Pipeline
 
 Three stages. Like grief, but productive.
 
-1. **Rule-based** (free, instant): Header analysis, domain matching, Gmail categories, subject patterns - classifies ~80% of emails. That's the push broom doing the heavy lifting
-2. **ML.NET classifier** (free, local, fast): Trained on your rule-classified data, classifies the remaining emails in seconds. The smart mop. My pride and joy
-3. **Human review**: Interactive TUI to approve/reject by category and sender. This is where YOU come in. Try not to break anything
+1. **Rule-based** (instant): Header analysis, domain matching, Gmail categories, subject patterns - classifies ~80% of emails. That's the push broom doing the heavy lifting
+2. **ML classifier** (local, fast): Trained on your rule-classified data, classifies the remaining emails in seconds. The smart mop. My pride and joy
+3. **Human review**: Interactive terminal UI to approve/reject by category and sender. This is where YOU come in. Try not to break anything
 
-### Training the ML Model
+### Training the Classifier
 
-The `train` command creates a text classifier using your rule-classified emails as training data:
-- Uses From + Subject + Snippet as features
-- SdcaMaximumEntropy multiclass trainer with TF-IDF text featurization
-- Cross-validates (5-fold) and reports per-class precision, recall, F1
-- Model saved to `%LOCALAPPDATA%/GmailCleanup/email_classifier.zip`
-- Can be retrained anytime as you review/reclassify more emails
-
-## ⚙️ Configuration
-
-- `appsettings.json` - Batch sizes, confidence thresholds
-- `rules/default-rules.json` - Customizable classification rules. My mopping playbook
+The `train` command creates a classifier using your rule-classified emails as training data. Cross-validates and reports per-class precision, recall, and F1. Can be retrained anytime as you review and reclassify more emails.
 
 ## 💾 Data Storage
 
 All local. I don't trust the cloud and neither should you.
 
-- SQLite database at `%LOCALAPPDATA%/GmailCleanup/gmail_cleanup.db`
-- ML model at `%LOCALAPPDATA%/GmailCleanup/email_classifier.zip`
-- All data stored locally - no external API calls during classification
+Everything is stored in the `gmail-data` Docker volume — the database, classifier model, and auth token. No data leaves your machine during classification.
 
 ## 🛡️ Safety Features
 
@@ -131,3 +142,54 @@ I may look reckless, but I'm a professional.
 - **Sender/domain whitelist** - protect the important stuff
 - **Full audit log per session** - receipts for everything
 - **Undo command** - because I knew you'd need it, Newbie
+
+---
+
+## 🔨 Development
+
+For contributors and developers. If you're just using the tool, everything above is all you need.
+
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [Docker](https://docs.docker.com/get-docker/) (for container builds)
+
+### Build & Test
+
+```bash
+dotnet build
+dotnet test
+dotnet format --verify-no-changes   # Check code style
+```
+
+### Run locally (without Docker)
+
+```bash
+dotnet run --project src/GmailCleanup -- auth
+dotnet run --project src/GmailCleanup -- fetch
+# etc.
+```
+
+When running locally, the default browser-based OAuth flow is used (no port mapping needed). Data is stored at `%LOCALAPPDATA%/GmailCleanup/` (Windows) or `~/.local/share/GmailCleanup/` (Linux/macOS).
+
+### Docker Build
+
+```bash
+# Build the image locally
+docker build -t gmail-cleanup .
+
+# Run the locally-built image
+docker run -it --rm gmail-cleanup --help
+```
+
+The image uses a multi-stage build with an [Ubuntu Chiseled](https://github.com/dotnet/dotnet-docker/blob/main/documentation/ubuntu-chiseled.md) (distroless) runtime — no shell, no package manager, ~50% smaller than standard images.
+
+### Configuration
+
+- `appsettings.json` - Batch sizes, confidence thresholds
+- `rules/default-rules.json` - Customisable classification rules
+
+### CI/CD
+
+- **CI** (`ci.yml`): Runs on all PRs — linting, formatting, build, and tests
+- **Deploy** (`deploy.yml`): Runs on merge to `main` — builds and pushes the Docker image to GitHub Container Registry (`ghcr.io`), then creates a GitHub Release

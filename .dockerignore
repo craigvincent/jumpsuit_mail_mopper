@@ -1,0 +1,18 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/node_modules
+**/.idea
+*.user
+*.suo
+*.log
+
+# Secrets — mount at runtime, never bake into image
+credentials.json
+token.json/
+
+# Build artifacts
+*.nupkg
+TestResults/
