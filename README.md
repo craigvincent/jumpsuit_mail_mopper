@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/jumpsuit_mail_mopper_small_logo.png" alt="Jumpsuit - Mail Mopper" width="300" />
+  <img src="assets/mail_mopper_small_logo.png" alt="Mail Mopper" width="300" />
 </p>
 
-# 🧹 Jumpsuit - Mail Mopper
+# 🧹 Mail Mopper
 
-## A CLI tool for Gmail inbox cleanup.
+## CLI Janitor for Gmail inbox cleanup.
 
 The Janitor's hybrid classification pipeline sorts through the mess — rules handle the obvious junk, a locally-trained classifier catches the rest — then lets you review everything in an interactive terminal UI before a single email hits the trash.
 
@@ -24,7 +24,7 @@ The Janitor's hybrid classification pipeline sorts through the mess — rules ha
 
 ## ✨ What the Mop Does
 
-- 📬 **Fetches email metadata** (headers only - I'm not reading your diary, Bambi) into a local database
+- 📬 **Fetches email metadata** (headers + snippet preview - I'm not reading your whole diary, Bambi) into a local database
 - 🧠 **Hybrid classification**: rule-based engine slaps labels on the obvious junk, then a locally-trained classifier handles the rest - like having a smarter mop
 - 🖥️ **Interactive review**: browse by category → sender → email subjects. You get final say, even though I'm always right
 - 🛡️ **Safe**: moves to Trash only (recoverable 30 days). I'm a janitor, not a monster
@@ -53,7 +53,7 @@ Look, even a doctor could do this part:
 ### 2. Pull the image
 
 ```bash
-docker pull ghcr.io/craigvincent/jumpsuit_mail_mopper:latest
+docker pull ghcr.io/craigvincent/mail_mopper:latest
 ```
 
 ### 3. Authenticate
@@ -61,9 +61,9 @@ docker pull ghcr.io/craigvincent/jumpsuit_mail_mopper:latest
 ```bash
 docker run -it --rm \
   -p 8484:8484 \
-  -v gmail-data:/home/app/.local/share/GmailCleanup \
+  -v gmail-data:/home/app/.local/share/MailMopper \
   -v "$(pwd)/credentials.json:/app/credentials.json:ro" \
-  ghcr.io/craigvincent/jumpsuit_mail_mopper auth
+  ghcr.io/craigvincent/mail_mopper auth
 ```
 
 This prints a Google sign-in URL. Open it in your browser, authorise, and the callback is captured through the port mapping. Your token is saved in the `gmail-data` volume for all future commands.
@@ -74,9 +74,9 @@ For convenience, set an alias (or substitute the full `docker run` command each 
 
 ```bash
 alias mopper='docker run -it --rm \
-  -v gmail-data:/home/app/.local/share/GmailCleanup \
+  -v gmail-data:/home/app/.local/share/MailMopper \
   -v "$(pwd)/credentials.json:/app/credentials.json:ro" \
-  ghcr.io/craigvincent/jumpsuit_mail_mopper'
+  ghcr.io/craigvincent/mail_mopper'
 ```
 
 Show all available commands:
@@ -147,49 +147,4 @@ I may look reckless, but I'm a professional.
 
 ## 🔨 Development
 
-For contributors and developers. If you're just using the tool, everything above is all you need.
-
-### Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Docker](https://docs.docker.com/get-docker/) (for container builds)
-
-### Build & Test
-
-```bash
-dotnet build
-dotnet test
-dotnet format --verify-no-changes   # Check code style
-```
-
-### Run locally (without Docker)
-
-```bash
-dotnet run --project src/GmailCleanup -- auth
-dotnet run --project src/GmailCleanup -- fetch
-# etc.
-```
-
-When running locally, the default browser-based OAuth flow is used (no port mapping needed). Data is stored at `%LOCALAPPDATA%/GmailCleanup/` (Windows) or `~/.local/share/GmailCleanup/` (Linux/macOS).
-
-### Docker Build
-
-```bash
-# Build the image locally
-docker build -t gmail-cleanup .
-
-# Run the locally-built image
-docker run -it --rm gmail-cleanup --help
-```
-
-The image uses a multi-stage build with an [Ubuntu Chiseled](https://github.com/dotnet/dotnet-docker/blob/main/documentation/ubuntu-chiseled.md) (distroless) runtime — no shell, no package manager, ~50% smaller than standard images.
-
-### Configuration
-
-- `appsettings.json` - Batch sizes, confidence thresholds
-- `rules/default-rules.json` - Customisable classification rules
-
-### CI/CD
-
-- **CI** (`ci.yml`): Runs on all PRs — linting, formatting, build, and tests
-- **Deploy** (`deploy.yml`): Runs on merge to `main` — builds and pushes the Docker image to GitHub Container Registry (`ghcr.io`), then creates a GitHub Release
+See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions, local development setup, Docker builds, and CI/CD details.

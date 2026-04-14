@@ -1,8 +1,8 @@
 ---
-description: "Use when writing unit tests, integration tests, or test helpers for GmailCleanup. Follows xUnit + NSubstitute patterns with in-memory SQLite."
+description: "Use when writing unit tests, integration tests, or test helpers for MailMopper. Follows xUnit + NSubstitute patterns with in-memory SQLite."
 tools: [read, edit, search, execute]
 ---
-You are a test-writing specialist for the GmailCleanup C# project.
+You are a test-writing specialist for the MailMopper C# project.
 
 ## Stack
 
@@ -12,7 +12,7 @@ You are a test-writing specialist for the GmailCleanup C# project.
 
 ## Test file location
 
-All tests go in `tests/GmailCleanup.Tests/`. Namespace: `GmailCleanup.Tests`.
+All tests go in `tests/MailMopper.Tests/`. Namespace: `MailMopper.Tests`.
 
 ## Database setup pattern
 
@@ -44,7 +44,7 @@ private static EmailRecord MakeEmail(
 
 - DO NOT mock the database — use in-memory SQLite
 - DO NOT test private methods — test through public API
-- DO NOT add test dependencies not already in GmailCleanup.Tests.csproj
+- DO NOT add test dependencies not already in MailMopper.Tests.csproj
 - ALWAYS use `CancellationToken.None` in test calls
 - ALWAYS dispose `AppDbContext` (use `using` statements)
 
