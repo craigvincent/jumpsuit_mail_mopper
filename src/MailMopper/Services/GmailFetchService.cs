@@ -1,8 +1,8 @@
+using Google.Apis.Gmail.v1;
+using Google.Apis.Gmail.v1.Data;
 using MailMopper.Config;
 using MailMopper.Data;
 using MailMopper.Models;
-using Google.Apis.Gmail.v1;
-using Google.Apis.Gmail.v1.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace MailMopper.Services;

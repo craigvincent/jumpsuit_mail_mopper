@@ -55,6 +55,10 @@ Commands: `auth`, `fetch`, `classify`, `train`, `review`, `execute`, `stats`, `u
 
 Rules in `rules/default-rules.json` support types: `header`, `gmail-category`, `sender-domain`, `sender-pattern`, `subject-pattern`. Lower `priority` value = higher precedence.
 
+## Before Completing Any Task
+
+Run `dotnet format` before finishing work to ensure code style consistency. CI enforces `dotnet format --verify-no-changes`.
+
 ## Safety
 
 - `DryRunDefault: true` in appsettings — always default to dry-run
