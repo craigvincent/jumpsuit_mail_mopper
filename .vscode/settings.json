@@ -1,0 +1,13 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "dotnet format": true,
+        "ForEach-Object": true,
+        "Get-Unique": true,
+        "docker build": true,
+        "docker run": true
+    },
+    "sonarlint.connectedMode.project": {
+        "connectionId": "craigvincent",
+        "projectKey": "craigvincent_mail_mopper"
+    }
+}
