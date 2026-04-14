@@ -19,6 +19,8 @@ public class RuleClassifier
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    private const string PatternsPropertyName = "patterns";
+
     private readonly AppSettings _appSettings;
     private List<Rule> _rules = [];
     private readonly Dictionary<string, Regex> _compiledRegexCache = [];
@@ -52,23 +54,19 @@ public class RuleClassifier
 
     public ClassificationResult? Classify(EmailRecord email)
     {
-        foreach (var rule in _rules)
-        {
-            if (MatchesRule(email, rule))
-            {
-                if (!Enum.TryParse<ClassificationCategory>(rule.Category, ignoreCase: true, out var category))
-                {
-                    category = ClassificationCategory.Unclassified;
-                }
+        var matchedRule = _rules.FirstOrDefault(r => MatchesRule(email, r));
+        if (matchedRule == null)
+            return null;
 
-                return new ClassificationResult(
-                    Category: category,
-                    RuleName: rule.Name ?? rule.Type,
-                    Confidence: 1.0);
-            }
+        if (!Enum.TryParse<ClassificationCategory>(matchedRule.Category, ignoreCase: true, out var category))
+        {
+            category = ClassificationCategory.Unclassified;
         }
 
-        return null;
+        return new ClassificationResult(
+            Category: category,
+            RuleName: matchedRule.Name ?? matchedRule.Type,
+            Confidence: 1.0);
     }
 
     public IReadOnlyList<(EmailRecord email, ClassificationResult result)> ClassifyAll(
@@ -101,12 +99,12 @@ public class RuleClassifier
 
     private static bool MatchesHeaderRule(EmailRecord email, Rule rule)
     {
-        var condition = rule.Condition as JsonElement?;
-        if (!condition.HasValue)
+        var condition = rule.Condition;
+        if (condition.ValueKind == JsonValueKind.Undefined)
             return false;
 
-        if (condition.Value.TryGetProperty("header", out var headerElement) &&
-            condition.Value.TryGetProperty("present", out var presentElement))
+        if (condition.TryGetProperty("header", out var headerElement) &&
+            condition.TryGetProperty("present", out var presentElement))
         {
             var headerName = headerElement.GetString();
             var shouldBePresent = presentElement.GetBoolean();
@@ -122,11 +120,11 @@ public class RuleClassifier
 
     private static bool MatchesGmailCategoryRule(EmailRecord email, Rule rule)
     {
-        var condition = rule.Condition as JsonElement?;
-        if (!condition.HasValue)
+        var condition = rule.Condition;
+        if (condition.ValueKind == JsonValueKind.Undefined)
             return false;
 
-        if (condition.Value.TryGetProperty("category", out var categoryElement))
+        if (condition.TryGetProperty("category", out var categoryElement))
         {
             var targetCategory = categoryElement.GetString();
             return !string.IsNullOrEmpty(email.GmailCategory) &&
@@ -138,11 +136,11 @@ public class RuleClassifier
 
     private static bool MatchesSenderDomainRule(EmailRecord email, Rule rule)
     {
-        var condition = rule.Condition as JsonElement?;
-        if (!condition.HasValue)
+        var condition = rule.Condition;
+        if (condition.ValueKind == JsonValueKind.Undefined)
             return false;
 
-        if (condition.Value.TryGetProperty("domains", out var domainsElement))
+        if (condition.TryGetProperty("domains", out var domainsElement))
         {
             var domains = domainsElement.EnumerateArray()
                 .Select(d => d.GetString())
@@ -161,11 +159,11 @@ public class RuleClassifier
 
     private bool MatchesSenderPatternRule(EmailRecord email, Rule rule)
     {
-        var condition = rule.Condition as JsonElement?;
-        if (!condition.HasValue)
+        var condition = rule.Condition;
+        if (condition.ValueKind == JsonValueKind.Undefined)
             return false;
 
-        if (condition.Value.TryGetProperty("patterns", out var patternsElement))
+        if (condition.TryGetProperty(PatternsPropertyName, out var patternsElement))
         {
             var patterns = patternsElement.EnumerateArray()
                 .Select(p => p.GetString())
@@ -183,11 +181,11 @@ public class RuleClassifier
 
     private bool MatchesSubjectPatternRule(EmailRecord email, Rule rule)
     {
-        var condition = rule.Condition as JsonElement?;
-        if (!condition.HasValue)
+        var condition = rule.Condition;
+        if (condition.ValueKind == JsonValueKind.Undefined)
             return false;
 
-        if (condition.Value.TryGetProperty("patterns", out var patternsElement))
+        if (condition.TryGetProperty(PatternsPropertyName, out var patternsElement))
         {
             var patterns = patternsElement.EnumerateArray()
                 .Select(p => p.GetString())
@@ -219,58 +217,53 @@ public class RuleClassifier
 
         foreach (var rule in _rules)
         {
-            var condition = rule.Condition as JsonElement?;
-            if (!condition.HasValue)
-                continue;
-
-            var patterns = new List<string>();
-
-            // Extract patterns from sender-pattern rules
-            if (rule.Type == "sender-pattern" &&
-                condition.Value.TryGetProperty("patterns", out var senderPatterns))
+            foreach (var pattern in ExtractPatternsFromRule(rule)
+                .Where(p => !_compiledRegexCache.ContainsKey(p)))
             {
-                patterns.AddRange(senderPatterns.EnumerateArray()
-                    .Select(p => p.GetString())
-                    .Where(p => !string.IsNullOrEmpty(p))!);
-            }
-
-            // Extract patterns from subject-pattern rules
-            if (rule.Type == "subject-pattern" &&
-                condition.Value.TryGetProperty("patterns", out var subjectPatterns))
-            {
-                patterns.AddRange(subjectPatterns.EnumerateArray()
-                    .Select(p => p.GetString())
-                    .Where(p => !string.IsNullOrEmpty(p))!);
-            }
-
-            // Compile each pattern with case-insensitive option
-            foreach (var pattern in patterns)
-            {
-                if (!_compiledRegexCache.ContainsKey(pattern))
-                {
-                    try
-                    {
-                        _compiledRegexCache[pattern] = new Regex(
-                            pattern,
-                            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                    }
-                    catch (ArgumentException)
-                    {
-                        // Invalid regex pattern, skip it
-                    }
-                }
+                TryCompilePattern(pattern);
             }
         }
     }
 
+    private static IEnumerable<string> ExtractPatternsFromRule(Rule rule)
+    {
+        var condition = rule.Condition;
+        if (condition.ValueKind == JsonValueKind.Undefined)
+            return [];
+
+        if (rule.Type is not ("sender-pattern" or "subject-pattern"))
+            return [];
+
+        if (!condition.TryGetProperty(PatternsPropertyName, out var patternsElement))
+            return [];
+
+        return patternsElement.EnumerateArray()
+            .Select(p => p.GetString())
+            .Where(p => !string.IsNullOrEmpty(p))!;
+    }
+
+    private void TryCompilePattern(string pattern)
+    {
+        try
+        {
+            _compiledRegexCache[pattern] = new Regex(
+                pattern,
+                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        }
+        catch (ArgumentException)
+        {
+            // Invalid regex pattern, skip it
+        }
+    }
+
     // Internal classes for JSON deserialization
-    private class RulesDocument
+    private sealed class RulesDocument
     {
         [JsonPropertyName("rules")]
         public List<Rule> Rules { get; set; } = [];
     }
 
-    private class Rule
+    private sealed class Rule
     {
         [JsonPropertyName("name")]
         public string? Name { get; set; }
