@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/jumpsuit_mail_mopper_small_logo.png" alt="Jumpsuit - Mail Mopper" width="300" />
+  <img src="assets/mail_mopper_small_logo.png" alt="Mail Mopper" width="300" />
 </p>
 
-# 🧹 Jumpsuit - Mail Mopper
+# 🧹 Mail Mopper
 
-## A CLI tool for Gmail inbox cleanup.
+## CLI Janitor for Gmail inbox cleanup.
 
 The Janitor's hybrid classification pipeline sorts through the mess — rules handle the obvious junk, a locally-trained classifier catches the rest — then lets you review everything in an interactive terminal UI before a single email hits the trash.
 
