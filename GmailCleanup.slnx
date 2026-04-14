@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/GmailCleanup/GmailCleanup.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/GmailCleanup.Tests/GmailCleanup.Tests.csproj" />
-  </Folder>
-</Solution>

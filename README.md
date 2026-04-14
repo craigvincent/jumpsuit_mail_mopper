@@ -53,7 +53,7 @@ Look, even a doctor could do this part:
 ### 2. Pull the image
 
 ```bash
-docker pull ghcr.io/craigvincent/jumpsuit_mail_mopper:latest
+docker pull ghcr.io/craigvincent/mail_mopper:latest
 ```
 
 ### 3. Authenticate
@@ -61,9 +61,9 @@ docker pull ghcr.io/craigvincent/jumpsuit_mail_mopper:latest
 ```bash
 docker run -it --rm \
   -p 8484:8484 \
-  -v gmail-data:/home/app/.local/share/GmailCleanup \
+  -v gmail-data:/home/app/.local/share/MailMopper \
   -v "$(pwd)/credentials.json:/app/credentials.json:ro" \
-  ghcr.io/craigvincent/jumpsuit_mail_mopper auth
+  ghcr.io/craigvincent/mail_mopper auth
 ```
 
 This prints a Google sign-in URL. Open it in your browser, authorise, and the callback is captured through the port mapping. Your token is saved in the `gmail-data` volume for all future commands.
@@ -74,9 +74,9 @@ For convenience, set an alias (or substitute the full `docker run` command each 
 
 ```bash
 alias mopper='docker run -it --rm \
-  -v gmail-data:/home/app/.local/share/GmailCleanup \
+  -v gmail-data:/home/app/.local/share/MailMopper \
   -v "$(pwd)/credentials.json:/app/credentials.json:ro" \
-  ghcr.io/craigvincent/jumpsuit_mail_mopper'
+  ghcr.io/craigvincent/mail_mopper'
 ```
 
 Show all available commands:
@@ -165,21 +165,21 @@ dotnet format --verify-no-changes   # Check code style
 ### Run locally (without Docker)
 
 ```bash
-dotnet run --project src/GmailCleanup -- auth
-dotnet run --project src/GmailCleanup -- fetch
+dotnet run --project src/MailMopper -- auth
+dotnet run --project src/MailMopper -- fetch
 # etc.
 ```
 
-When running locally, the default browser-based OAuth flow is used (no port mapping needed). Data is stored at `%LOCALAPPDATA%/GmailCleanup/` (Windows) or `~/.local/share/GmailCleanup/` (Linux/macOS).
+When running locally, the default browser-based OAuth flow is used (no port mapping needed). Data is stored at `%LOCALAPPDATA%/MailMopper/` (Windows) or `~/.local/share/MailMopper/` (Linux/macOS).
 
 ### Docker Build
 
 ```bash
 # Build the image locally
-docker build -t gmail-cleanup .
+docker build -t mail_mopper .
 
 # Run the locally-built image
-docker run -it --rm gmail-cleanup --help
+docker run -it --rm mail_mopper --help
 ```
 
 The image uses a multi-stage build with an [Ubuntu Chiseled](https://github.com/dotnet/dotnet-docker/blob/main/documentation/ubuntu-chiseled.md) (distroless) runtime — no shell, no package manager, ~50% smaller than standard images.

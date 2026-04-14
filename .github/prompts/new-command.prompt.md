@@ -3,11 +3,11 @@ description: "Scaffold a new Spectre.Console.Cli command with settings class, fo
 agent: "agent"
 argument-hint: "command name and description, e.g. 'export - Export classification results to CSV'"
 ---
-Create a new CLI command for the GmailCleanup project. Follow these patterns exactly:
+Create a new CLI command for the MailMopper project. Follow these patterns exactly:
 
 ## File structure
 
-Create `src/GmailCleanup/Commands/{Name}Command.cs` with:
+Create `src/MailMopper/Commands/{Name}Command.cs` with:
 
 1. **Settings class** (if command has options): `{Name}Settings : CommandSettings` with `[CommandOption]` and `[Description]` attributes
 2. **Command class**: `{Name}Command : AsyncCommand<{Name}Settings>` (or `AsyncCommand` if no options)
@@ -17,11 +17,11 @@ Create `src/GmailCleanup/Commands/{Name}Command.cs` with:
 ```csharp
 using Spectre.Console;
 using Spectre.Console.Cli;
-using GmailCleanup.Data;
-using GmailCleanup.Services;
+using MailMopper.Data;
+using MailMopper.Services;
 using System.ComponentModel;
 
-namespace GmailCleanup.Commands;
+namespace MailMopper.Commands;
 
 public class {Name}Settings : CommandSettings
 {
@@ -55,7 +55,7 @@ public class {Name}Command : AsyncCommand<{Name}Settings>
 
 ## Registration
 
-After creating the command file, register it in `src/GmailCleanup/Program.cs` inside the `config.AddCommand<>()` block:
+After creating the command file, register it in `src/MailMopper/Program.cs` inside the `config.AddCommand<>()` block:
 
 ```csharp
 config.AddCommand<{Name}Command>("{kebab-name}")

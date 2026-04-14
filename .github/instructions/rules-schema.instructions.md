@@ -28,4 +28,4 @@ Each rule in the `rules` array must have these fields:
 - Add new domains to the existing `sender-domain` rule when possible, rather than creating a new rule
 - Use case-insensitive regex patterns (the engine applies `RegexOptions.IgnoreCase`)
 - Keep priority gaps (10, 20, 30...) to allow inserting rules between existing ones
-- Test new rules by running: `dotnet run --project src/GmailCleanup -- classify --skip-ml`
+- Test new rules by running: `dotnet run --project src/MailMopper -- classify --skip-ml`
