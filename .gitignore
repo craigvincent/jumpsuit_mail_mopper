@@ -50,6 +50,7 @@ project.lock.json
 *.trx
 *.coverage
 *.coveragexml
+coverage/
 
 # Publish
 publish/
