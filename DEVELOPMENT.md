@@ -42,7 +42,39 @@ The image uses a multi-stage build with an [Ubuntu Chiseled](https://github.com/
 - `appsettings.json` - Batch sizes, confidence thresholds
 - `rules/default-rules.json` - Customisable classification rules
 
+## Static Analysis & Coverage
+
+### .NET Analyzers (local)
+
+Static analysis runs automatically on every build via settings in `Directory.Build.props`:
+
+- `EnableNETAnalyzers` with `AnalysisLevel: latest-recommended`
+- `TreatWarningsAsErrors` — all analyzer warnings are build errors
+- `EnforceCodeStyleInBuild` — code style rules enforced at build time
+
+No extra tooling needed — just `dotnet build`.
+
+### Code Coverage (local)
+
+```bash
+dotnet test \
+  --collect:"XPlat Code Coverage" \
+  --settings tests/MailMopper.Tests/coverlet.runsettings \
+  --results-directory ./coverage
+```
+
+Coverage reports (Cobertura + OpenCover XML) are written to `./coverage/`.
+
+### SonarCloud (CI)
+
+SonarCloud runs via CI-based scanner on every push and PR, including coverage upload. Results are posted to the [SonarCloud dashboard](https://sonarcloud.io).
+
+**Setup:** Disable Automatic Analysis in SonarCloud (Administration → Analysis Method), then configure these in GitHub repo settings:
+- **Secret:** `SONAR_TOKEN` — from SonarCloud → My Account → Security
+- **Variable:** `SONAR_PROJECT_KEY` — your SonarCloud project key
+- **Variable:** `SONAR_ORG` — your SonarCloud organisation key
+
 ## CI/CD
 
-- **CI** (`ci.yml`): Runs on all PRs — linting, formatting, build, and tests
+- **CI** (`ci.yml`): Runs on all PRs — formatting, build, tests, coverage reporting and SonarCloud static analysis
 - **Deploy** (`deploy.yml`): Runs on merge to `main` — builds and pushes the Docker image to GitHub Container Registry (`ghcr.io`), then creates a GitHub Release
