@@ -24,7 +24,7 @@ The Janitor's hybrid classification pipeline sorts through the mess — rules ha
 
 ## ✨ What the Mop Does
 
-- 📬 **Fetches email metadata** (headers only - I'm not reading your diary, Bambi) into a local database
+- 📬 **Fetches email metadata** (headers + snippet preview - I'm not reading your whole diary, Bambi) into a local database
 - 🧠 **Hybrid classification**: rule-based engine slaps labels on the obvious junk, then a locally-trained classifier handles the rest - like having a smarter mop
 - 🖥️ **Interactive review**: browse by category → sender → email subjects. You get final say, even though I'm always right
 - 🛡️ **Safe**: moves to Trash only (recoverable 30 days). I'm a janitor, not a monster
