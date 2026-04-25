@@ -9,7 +9,6 @@ namespace MailMopper.Services;
 
 public class GmailFetchService
 {
-    private readonly GmailService _gmailService;
     private readonly AppDbContext _dbContext;
     private readonly AppSettings _appSettings;
     private readonly GmailSession _session;
@@ -20,9 +19,13 @@ public class GmailFetchService
         AppSettings appSettings)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
-        _gmailService = session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+    }
+
+    private GmailService GetGmailService()
+    {
+        return _session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
     }
 
     /// <summary>
@@ -38,7 +41,7 @@ public class GmailFetchService
 
         do
         {
-            var listRequest = _gmailService.Users.Messages.List("me");
+            var listRequest = GetGmailService().Users.Messages.List("me");
             listRequest.MaxResults = 500;
             if (pageToken != null)
                 listRequest.PageToken = pageToken;
@@ -95,7 +98,7 @@ public class GmailFetchService
         {
             do
             {
-                var historyRequest = _gmailService.Users.History.List("me");
+                var historyRequest = GetGmailService().Users.History.List("me");
                 historyRequest.StartHistoryId = ulong.Parse(lastSync.LastHistoryId, System.Globalization.CultureInfo.InvariantCulture);
                 if (pageToken != null)
                     historyRequest.PageToken = pageToken;
@@ -171,7 +174,7 @@ public class GmailFetchService
 
             try
             {
-                var getRequest = _gmailService.Users.Messages.Get("me", messageIds[i]);
+                var getRequest = GetGmailService().Users.Messages.Get("me", messageIds[i]);
                 getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
                 getRequest.MetadataHeaders = new[] { "From", "To", "Subject", "Date", "List-Unsubscribe" };
 
@@ -282,7 +285,7 @@ public class GmailFetchService
             try
             {
                 // Minimal fetch — just need InternalDate
-                var getRequest = _gmailService.Users.Messages.Get("me", suspect[i].MessageId);
+                var getRequest = GetGmailService().Users.Messages.Get("me", suspect[i].MessageId);
                 getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Minimal;
 
                 var message = await getRequest.ExecuteAsync(ct);

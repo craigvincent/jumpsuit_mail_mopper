@@ -8,12 +8,16 @@ namespace MailMopper.Services;
 /// </summary>
 public class GmailApiWrapper : IGmailApi
 {
-    private readonly GmailService _gmail;
+    private readonly GmailSession _session;
 
     public GmailApiWrapper(GmailSession session)
     {
-        ArgumentNullException.ThrowIfNull(session);
-        _gmail = session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+    }
+
+    private GmailService GetGmailService()
+    {
+        return _session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
     }
 
     public async Task BatchModifyAsync(IList<string> messageIds, IList<string>? addLabelIds, IList<string>? removeLabelIds, CancellationToken ct)
@@ -25,6 +29,6 @@ public class GmailApiWrapper : IGmailApi
             RemoveLabelIds = removeLabelIds
         };
 
-        await _gmail.Users.Messages.BatchModify(request, "me").ExecuteAsync(ct);
+        await GetGmailService().Users.Messages.BatchModify(request, "me").ExecuteAsync(ct);
     }
 }
