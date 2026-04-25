@@ -12,7 +12,7 @@ dotnet test
 dotnet run --project src/MailMopper -- <command>
 ```
 
-Commands: `auth`, `fetch`, `classify`, `train`, `review`, `execute`, `stats`, `undo`, `repair-dates`, `run`
+Commands: `auth`, `fetch`, `classify`, `train`, `review`, `execute`, `stats`, `undo`, `repair-dates`, `reset`, `run`
 
 ## Architecture
 

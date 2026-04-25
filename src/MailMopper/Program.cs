@@ -72,6 +72,9 @@ app.Configure(config =>
 
     config.AddCommand<RunCommand>("run")
         .WithDescription("Full pipeline: fetch → classify → review → execute");
+
+    config.AddCommand<ResetCommand>("reset")
+        .WithDescription("Wipe all local data and start fresh");
 });
 
 return await app.RunAsync(args);
