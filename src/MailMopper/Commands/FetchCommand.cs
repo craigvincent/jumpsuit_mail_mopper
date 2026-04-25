@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using MailMopper.Config;
+using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
@@ -15,32 +17,39 @@ public class FetchSettings : CommandSettings
 
 public class FetchCommand : AsyncCommand<FetchSettings>
 {
+    private readonly GmailAuthService _authService;
+    private readonly AppDbContext _dbContext;
+    private readonly AppSettings _appSettings;
+
+    public FetchCommand(GmailAuthService authService, AppDbContext dbContext, AppSettings appSettings)
+    {
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context, FetchSettings settings)
     {
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Gmail Email Fetch[/]");
 
-            var appSettings = CommandHelper.LoadSettings();
-            var authService = new GmailAuthService(appSettings);
-            using var dbContext = CommandHelper.CreateDbContext();
-
             // Authenticate
             var gmail = await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await authService.AuthenticateAsync(CancellationToken.None);
+                    return await _authService.AuthenticateAsync(CancellationToken.None);
                 });
 
             // Ensure database is created
-            await dbContext.Database.EnsureCreatedAsync();
-            var fetchService = new GmailFetchService(gmail, dbContext, appSettings);
+            await _dbContext.Database.EnsureCreatedAsync();
+            var fetchService = new GmailFetchService(gmail, _dbContext, _appSettings);
 
             // Determine fetch strategy
             bool isFullFetch = settings.FullFetch;
             if (!isFullFetch)
             {
-                var lastSync = await dbContext.SyncStates
+                var lastSync = await _dbContext.SyncStates
                     .FirstOrDefaultAsync(s => s.Key == "default", CancellationToken.None);
 
                 isFullFetch = lastSync?.LastSyncAt == null;

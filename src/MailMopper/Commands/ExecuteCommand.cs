@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using MailMopper.Config;
+using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
@@ -19,19 +21,27 @@ public class ExecuteSettings : CommandSettings
 
 public class ExecuteCommand : AsyncCommand<ExecuteSettings>
 {
+    private readonly GmailAuthService _authService;
+    private readonly AppDbContext _dbContext;
+    private readonly AppSettings _appSettings;
+
+    public ExecuteCommand(GmailAuthService authService, AppDbContext dbContext, AppSettings appSettings)
+    {
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context, ExecuteSettings settings)
     {
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Execute Actions[/]");
 
-            var appSettings = CommandHelper.LoadSettings();
-            var authService = new GmailAuthService(appSettings);
-            using var dbContext = CommandHelper.CreateDbContext();
-            await dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync();
 
             // Count approved-for-trash classifications
-            var approvedCount = await dbContext.Classifications
+            var approvedCount = await _dbContext.Classifications
                 .Where(c => c.ReviewDecision == Models.ReviewDecision.ApproveTrash)
                 .CountAsync(CancellationToken.None);
 
@@ -65,10 +75,10 @@ public class ExecuteCommand : AsyncCommand<ExecuteSettings>
             var gmail = await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await authService.AuthenticateAsync(CancellationToken.None);
+                    return await _authService.AuthenticateAsync(CancellationToken.None);
                 });
 
-            var actionService = new ActionService(new GmailApiWrapper(gmail), dbContext, appSettings);
+            var actionService = new ActionService(new GmailApiWrapper(gmail), _dbContext, _appSettings);
 
             // Execute with progress
             ActionSummary? result = null;

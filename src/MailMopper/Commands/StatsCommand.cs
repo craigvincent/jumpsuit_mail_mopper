@@ -1,4 +1,5 @@
 using System.Globalization;
+using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
@@ -8,20 +9,26 @@ namespace MailMopper.Commands;
 
 public class StatsCommand : AsyncCommand
 {
+    private readonly DatabaseService _databaseService;
+    private readonly AppDbContext _dbContext;
+
+    public StatsCommand(DatabaseService databaseService, AppDbContext dbContext)
+    {
+        _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Statistics[/]");
 
-            using var dbContext = CommandHelper.CreateDbContext();
-            await dbContext.Database.EnsureCreatedAsync();
-
-            var databaseService = new DatabaseService(dbContext);
+            await _dbContext.Database.EnsureCreatedAsync();
 
             // Get stats and category summary
-            var stats = await databaseService.GetStatsAsync(CancellationToken.None);
-            var categorySummary = await databaseService.GetCategorySummaryAsync(CancellationToken.None);
+            var stats = await _databaseService.GetStatsAsync(CancellationToken.None);
+            var categorySummary = await _databaseService.GetCategorySummaryAsync(CancellationToken.None);
 
             // Display overall stats
             var statsTable = new Table();
@@ -63,7 +70,7 @@ public class StatsCommand : AsyncCommand
 
             // Display top senders
             AnsiConsole.MarkupLine("\n");
-            var topSenders = await dbContext.Emails
+            var topSenders = await _dbContext.Emails
                 .Where(e => e.From != null)
                 .GroupBy(e => e.From)
                 .Select(g => new { Sender = g.Key, Count = g.Count() })

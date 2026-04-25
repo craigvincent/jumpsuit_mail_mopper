@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
+using MailMopper.Config;
+using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
@@ -16,27 +18,34 @@ public class ClassifySettings : CommandSettings
 
 public class ClassifyCommand : AsyncCommand<ClassifySettings>
 {
+    private readonly RuleClassifier _ruleClassifier;
+    private readonly AppDbContext _dbContext;
+    private readonly AppSettings _appSettings;
+
+    public ClassifyCommand(RuleClassifier ruleClassifier, AppDbContext dbContext, AppSettings appSettings)
+    {
+        _ruleClassifier = ruleClassifier ?? throw new ArgumentNullException(nameof(ruleClassifier));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context, ClassifySettings settings)
     {
         try
         {
             Console.WriteLine("=== Email Classification ===");
 
-            var appSettings = CommandHelper.LoadSettings();
-            using var dbContext = CommandHelper.CreateDbContext();
-            await dbContext.Database.EnsureCreatedAsync();
-
-            var ruleClassifier = new RuleClassifier(appSettings);
+            await _dbContext.Database.EnsureCreatedAsync();
 
             // Try to load ML model if not skipping
             using MlClassifier? mlClassifier = !settings.SkipMl
-                ? TryLoadMlClassifier(appSettings)
+                ? TryLoadMlClassifier(_appSettings)
                 : null;
 
-            var pipeline = new ClassificationPipeline(ruleClassifier, mlClassifier, dbContext, appSettings);
+            var pipeline = new ClassificationPipeline(_ruleClassifier, mlClassifier, _dbContext, _appSettings);
 
-            var totalEmails = await dbContext.Emails.CountAsync();
-            var classifiedCount = await dbContext.Classifications.CountAsync();
+            var totalEmails = await _dbContext.Emails.CountAsync();
+            var classifiedCount = await _dbContext.Classifications.CountAsync();
             var unclassifiedCount = totalEmails - classifiedCount;
 
             Console.WriteLine($"  {unclassifiedCount} emails to classify");
@@ -51,7 +60,7 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
             Console.WriteLine();
 
             // Get category breakdown
-            var categoryBreakdown = await dbContext.Classifications
+            var categoryBreakdown = await _dbContext.Classifications
                 .GroupBy(c => c.Category)
                 .Select(g => new { Category = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
@@ -85,7 +94,7 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
         }
     }
 
-    private static MlClassifier? TryLoadMlClassifier(Config.AppSettings appSettings)
+    private static MlClassifier? TryLoadMlClassifier(AppSettings appSettings)
     {
         var modelPath = appSettings.Ml?.ModelPath ?? ModelTrainerService.GetDefaultModelPath();
         if (File.Exists(modelPath))

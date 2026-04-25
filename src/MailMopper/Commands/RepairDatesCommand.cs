@@ -1,3 +1,5 @@
+using MailMopper.Config;
+using MailMopper.Data;
 using MailMopper.Services;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -6,6 +8,17 @@ namespace MailMopper.Commands;
 
 public class RepairDatesCommand : AsyncCommand
 {
+    private readonly GmailAuthService _authService;
+    private readonly AppDbContext _dbContext;
+    private readonly AppSettings _appSettings;
+
+    public RepairDatesCommand(GmailAuthService authService, AppDbContext dbContext, AppSettings appSettings)
+    {
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         try
@@ -14,18 +27,15 @@ public class RepairDatesCommand : AsyncCommand
             AnsiConsole.MarkupLine("[dim]Fixes emails whose date was incorrectly set to fetch time.[/]");
             AnsiConsole.WriteLine();
 
-            var appSettings = CommandHelper.LoadSettings();
-            var authService = new GmailAuthService(appSettings);
-            using var dbContext = CommandHelper.CreateDbContext();
-            await dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync();
 
             var gmail = await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await authService.AuthenticateAsync(CancellationToken.None);
+                    return await _authService.AuthenticateAsync(CancellationToken.None);
                 });
 
-            var fetchService = new GmailFetchService(gmail, dbContext, appSettings);
+            var fetchService = new GmailFetchService(gmail, _dbContext, _appSettings);
 
             var repaired = await fetchService.RepairDatesAsync(
                 onStatus: msg => AnsiConsole.MarkupLine($"  {Markup.Escape(msg)}"),

@@ -1,3 +1,4 @@
+using MailMopper.Config;
 using MailMopper.Services;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -6,14 +7,21 @@ namespace MailMopper.Commands;
 
 public class AuthCommand : AsyncCommand
 {
+    private readonly GmailAuthService _authService;
+    private readonly AppSettings _appSettings;
+
+    public AuthCommand(GmailAuthService authService, AppSettings appSettings)
+    {
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
-        var appSettings = CommandHelper.LoadSettings();
-
         AnsiConsole.MarkupLine("[bold blue]Gmail Authentication Setup[/]");
-        AnsiConsole.MarkupLine($"Looking for credentials at: [yellow]{appSettings.Gmail.CredentialsPath}[/]");
+        AnsiConsole.MarkupLine($"Looking for credentials at: [yellow]{_appSettings.Gmail.CredentialsPath}[/]");
 
-        if (!File.Exists(appSettings.Gmail.CredentialsPath))
+        if (!File.Exists(_appSettings.Gmail.CredentialsPath))
         {
             AnsiConsole.MarkupLine("[red]credentials.json not found![/]");
             AnsiConsole.MarkupLine("Please download OAuth2 credentials from Google Cloud Console:");
@@ -23,12 +31,10 @@ public class AuthCommand : AsyncCommand
             return 1;
         }
 
-        var authService = new GmailAuthService(appSettings);
-
         await AnsiConsole.Status()
             .StartAsync("Authenticating with Gmail...", async ctx =>
             {
-                var gmail = await authService.AuthenticateAsync(CancellationToken.None);
+                var gmail = await _authService.AuthenticateAsync(CancellationToken.None);
                 var profile = await gmail.Users.GetProfile("me").ExecuteAsync();
                 AnsiConsole.MarkupLine($"[green]✓[/] Authenticated as: [bold]{profile.EmailAddress}[/]");
                 AnsiConsole.MarkupLine($"[green]✓[/] Total messages: [bold]{profile.MessagesTotal}[/]");

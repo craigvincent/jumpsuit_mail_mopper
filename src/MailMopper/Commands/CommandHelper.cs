@@ -1,5 +1,4 @@
 using MailMopper.Config;
-using MailMopper.Data;
 using Microsoft.Extensions.Configuration;
 
 namespace MailMopper.Commands;
@@ -36,9 +35,4 @@ internal static class CommandHelper
         return settings;
     }
 
-    /// <summary>
-    /// Creates a new AppDbContext instance with default configuration.
-    /// </summary>
-    /// <returns>New AppDbContext instance</returns>
-    public static AppDbContext CreateDbContext() => new();
 }

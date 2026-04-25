@@ -1,12 +1,29 @@
 using System.Reflection;
 using MailMopper.Commands;
+using MailMopper.Data;
+using MailMopper.Infrastructure;
+using MailMopper.Services;
+using MailMopper.Tui;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console.Cli;
 
 var version = typeof(Program).Assembly
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
     ?? "0.0.0";
 
-var app = new CommandApp();
+// Build service collection
+var services = new ServiceCollection();
+
+var appSettings = CommandHelper.LoadSettings();
+services.AddSingleton(appSettings);
+services.AddSingleton(_ => new AppDbContext());
+services.AddTransient<GmailAuthService>();
+services.AddTransient<RuleClassifier>();
+services.AddTransient<DatabaseService>();
+services.AddTransient<ModelTrainerService>();
+services.AddTransient<ReviewApp>();
+
+var app = new CommandApp(new TypeRegistrar(services));
 
 app.Configure(config =>
 {
