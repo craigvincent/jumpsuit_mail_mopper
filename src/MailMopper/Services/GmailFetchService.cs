@@ -255,11 +255,13 @@ public class GmailFetchService
         Action<string>? onStatus,
         CancellationToken ct)
     {
-        // Find emails where Date is suspiciously close to FetchedAt (within 5 minutes)
-        // These are the ones where ParseDateHeader fell back to DateTimeOffset.UtcNow
+        // Suspect dates: null (parse failure), DateTimeOffset.MinValue (legacy fallback),
+        // or suspiciously close to FetchedAt (older legacy fallback to UtcNow).
         var allEmails = await _dbContext.Emails.ToListAsync(ct);
         var suspect = allEmails
-            .Where(e => Math.Abs((e.Date - e.FetchedAt).TotalMinutes) < 5)
+            .Where(e => e.Date is null
+                     || e.Date == DateTimeOffset.MinValue
+                     || Math.Abs((e.Date.Value - e.FetchedAt).TotalMinutes) < 5)
             .ToList();
 
         if (suspect.Count == 0)
@@ -391,10 +393,10 @@ public class GmailFetchService
         }
     }
 
-    private static DateTimeOffset ParseDateHeader(string dateStr)
+    private static DateTimeOffset? ParseDateHeader(string dateStr)
     {
         if (string.IsNullOrWhiteSpace(dateStr))
-            return DateTimeOffset.MinValue;
+            return null;
 
         if (DateTimeOffset.TryParse(dateStr, out var result))
             return result;
@@ -418,7 +420,7 @@ public class GmailFetchService
             System.Globalization.DateTimeStyles.AllowWhiteSpaces, out result))
             return result;
 
-        return DateTimeOffset.MinValue;
+        return null;
     }
 
     private static string ExtractCategory(IList<string>? labelIds)

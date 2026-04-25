@@ -87,8 +87,8 @@ public class ReviewApp
             .ToList();
 
         _availableYears = _allReviewable
-            .Where(c => c.Email?.Date != default)
-            .Select(c => c.Email!.Date.Year)
+            .Where(c => c.Email?.Date != null)
+            .Select(c => c.Email!.Date!.Value.Year)
             .Distinct()
             .OrderBy(y => y)
             .ToList();
@@ -99,7 +99,7 @@ public class ReviewApp
     private void RebuildGroups()
     {
         var filtered = _yearFilter.HasValue
-            ? _allReviewable.Where(c => c.Email?.Date.Year == _yearFilter.Value).ToList()
+            ? _allReviewable.Where(c => c.Email?.Date?.Year == _yearFilter.Value).ToList()
             : _allReviewable;
 
         _groups = filtered
@@ -527,7 +527,7 @@ public class ReviewApp
 
         foreach (var c in sender.Classifications.OrderByDescending(c => c.Email?.Date).Take(25))
         {
-            var date = c.Email?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
+            var date = c.Email?.Date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
             var subject = c.Email?.Subject ?? "-";
             subject = subject.Length > 70 ? subject[..67] + "..." : subject;
             var size = FormatSize(c.Email?.SizeEstimate ?? 0);
@@ -646,8 +646,8 @@ public class ReviewApp
     private void RenderYearBreakdown()
     {
         var yearBreakdown = _allReviewable
-            .Where(c => c.Email?.Date != default)
-            .GroupBy(c => c.Email!.Date.Year)
+            .Where(c => c.Email?.Date != null)
+            .GroupBy(c => c.Email!.Date!.Value.Year)
             .OrderBy(g => g.Key)
             .Select(g => new { Year = g.Key, Count = g.Count(), Size = g.Sum(c => c.Email?.SizeEstimate ?? 0) })
             .ToList();

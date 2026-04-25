@@ -472,7 +472,7 @@ public class EndToEndTests : IDisposable
             .ToListAsync();
 
         var yearBreakdown = pendingWithEmail
-            .GroupBy(c => c.Email!.Date.Year)
+            .GroupBy(c => c.Email!.Date!.Value.Year)
             .Select(g => new { Year = g.Key, Count = g.Count() })
             .OrderBy(g => g.Year)
             .ToList();
@@ -485,10 +485,10 @@ public class EndToEndTests : IDisposable
 
         // Filter to just 2020 (client-side since SQLite can't translate Date.Year)
         var oldEmails = pendingWithEmail
-            .Where(c => c.Email!.Date.Year == 2020)
+            .Where(c => c.Email!.Date!.Value.Year == 2020)
             .ToList();
         Assert.Equal(2, oldEmails.Count);
-        Assert.All(oldEmails, c => Assert.Equal(2020, c.Email!.Date.Year));
+        Assert.All(oldEmails, c => Assert.Equal(2020, c.Email!.Date!.Value.Year));
     }
 
     // ──────────────────────────────────────────────────────────────────
