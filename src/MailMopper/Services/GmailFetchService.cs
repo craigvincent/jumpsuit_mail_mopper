@@ -23,10 +23,8 @@ public class GmailFetchService
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
     }
 
-    private GmailService GetGmailService()
-    {
-        return _session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
-    }
+    private GmailService GetGmailService() =>
+        _session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
 
     /// <summary>
     /// Fetches all emails from Gmail and stores them in the local database.
@@ -139,7 +137,7 @@ public class GmailFetchService
         }
 
         // Fetch sequentially with rate limiting
-        int savedCount = await FetchAndSaveMessagesAsync(
+        var savedCount = await FetchAndSaveMessagesAsync(
             newMessageIds, progress, 0, newMessageIds.Count, ct);
 
         // Update SyncState
@@ -163,12 +161,12 @@ public class GmailFetchService
         int progressTotal,
         CancellationToken ct)
     {
-        int fetchedCount = 0;
-        int savedCount = 0;
+        var fetchedCount = 0;
+        var savedCount = 0;
         var pendingRecords = new List<EmailRecord>();
-        int batchSize = _appSettings.Gmail.BatchSize;
+        var batchSize = _appSettings.Gmail.BatchSize;
 
-        for (int i = 0; i < messageIds.Count; i++)
+        for (var i = 0; i < messageIds.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
 

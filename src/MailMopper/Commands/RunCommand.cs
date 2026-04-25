@@ -22,8 +22,7 @@ public class RunSettings : CommandSettings
 
 public class RunCommand : AsyncCommand<RunSettings>
 {
-    private readonly GmailAuthService _authService;
-    private readonly GmailFetchService _fetchService;
+    private readonly GmailServices _gmailServices;
     private readonly RuleClassifier _ruleClassifier;
     private readonly ReviewApp _reviewApp;
     private readonly ActionService _actionService;
@@ -31,10 +30,9 @@ public class RunCommand : AsyncCommand<RunSettings>
     private readonly AppSettings _appSettings;
     private readonly AppCancellation _cancellation;
 
-    public RunCommand(GmailAuthService authService, GmailFetchService fetchService, RuleClassifier ruleClassifier, ReviewApp reviewApp, ActionService actionService, AppDbContext dbContext, AppSettings appSettings, AppCancellation cancellation)
+    public RunCommand(GmailServices gmailServices, RuleClassifier ruleClassifier, ReviewApp reviewApp, ActionService actionService, AppDbContext dbContext, AppSettings appSettings, AppCancellation cancellation)
     {
-        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-        _fetchService = fetchService ?? throw new ArgumentNullException(nameof(fetchService));
+        _gmailServices = gmailServices ?? throw new ArgumentNullException(nameof(gmailServices));
         _ruleClassifier = ruleClassifier ?? throw new ArgumentNullException(nameof(ruleClassifier));
         _reviewApp = reviewApp ?? throw new ArgumentNullException(nameof(reviewApp));
         _actionService = actionService ?? throw new ArgumentNullException(nameof(actionService));
@@ -58,7 +56,7 @@ public class RunCommand : AsyncCommand<RunSettings>
             await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    await _authService.AuthenticateAsync(ct);
+                    await _gmailServices.Auth.AuthenticateAsync(ct);
                 });
 
             // Step 2: Fetch
@@ -74,7 +72,7 @@ public class RunCommand : AsyncCommand<RunSettings>
                         if (p.total > 0)
                             task.Value = (double)p.fetched / p.total * 100;
                     });
-                    totalFetched = await _fetchService.FetchIncrementalAsync(progress, ct);
+                    totalFetched = await _gmailServices.Fetch.FetchIncrementalAsync(progress, ct);
                 });
 
             AnsiConsole.MarkupLine($"[green]✓ Fetched {totalFetched} email(s)[/]");

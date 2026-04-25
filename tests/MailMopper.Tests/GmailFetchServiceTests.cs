@@ -11,10 +11,8 @@ public class GmailFetchServiceTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void ParseDateHeader_NullOrEmpty_ReturnsNull(string? input)
-    {
+    public void ParseDateHeader_NullOrEmpty_ReturnsNull(string? input) =>
         Assert.Null(GmailFetchService.ParseDateHeader(input));
-    }
 
     [Fact]
     public void ParseDateHeader_ValidIsoDate_ReturnsCorrectValue()
@@ -94,10 +92,8 @@ public class GmailFetchServiceTests
     [InlineData("Name <user@domain.com>", "domain.com")]
     [InlineData("\"Display Name\" <contact@company.org>", "company.org")]
     [InlineData("noreply+nospam@service.io", "service.io")]
-    public void ExtractEmailDomain_ValidFormats_ReturnsDomain(string input, string expected)
-    {
+    public void ExtractEmailDomain_ValidFormats_ReturnsDomain(string input, string expected) =>
         Assert.Equal(expected, GmailFetchService.ExtractEmailDomain(input));
-    }
 
     [Theory]
     [InlineData(null)]
@@ -105,38 +101,28 @@ public class GmailFetchServiceTests
     [InlineData("   ")]
     [InlineData("not-an-email")]
     [InlineData("no-at-sign-here")]
-    public void ExtractEmailDomain_InvalidFormats_ReturnsEmpty(string? input)
-    {
+    public void ExtractEmailDomain_InvalidFormats_ReturnsEmpty(string? input) =>
         Assert.Equal(string.Empty, GmailFetchService.ExtractEmailDomain(input));
-    }
 
     [Fact]
-    public void ExtractEmailDomain_AngleBrackets_ExtractsCorrectly()
-    {
+    public void ExtractEmailDomain_AngleBrackets_ExtractsCorrectly() =>
         Assert.Equal("company.com", GmailFetchService.ExtractEmailDomain("<support@company.com>"));
-    }
 
     #endregion
 
     #region ParseInternalDate
 
     [Fact]
-    public void ParseInternalDate_Null_ReturnsNull()
-    {
+    public void ParseInternalDate_Null_ReturnsNull() =>
         Assert.Null(GmailFetchService.ParseInternalDate(null));
-    }
 
     [Fact]
-    public void ParseInternalDate_Zero_ReturnsNull()
-    {
+    public void ParseInternalDate_Zero_ReturnsNull() =>
         Assert.Null(GmailFetchService.ParseInternalDate(0));
-    }
 
     [Fact]
-    public void ParseInternalDate_Negative_ReturnsNull()
-    {
+    public void ParseInternalDate_Negative_ReturnsNull() =>
         Assert.Null(GmailFetchService.ParseInternalDate(-1));
-    }
 
     [Fact]
     public void ParseInternalDate_ValidMilliseconds_ReturnsCorrectDate()

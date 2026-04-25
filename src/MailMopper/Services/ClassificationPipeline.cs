@@ -212,8 +212,8 @@ public class ClassificationPipeline
             .Select(g => new { Category = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Category, x => x.Count, ct);
 
-        int classified = ruleClassified + aiClassified;
-        int unclassified = Math.Max(0, totalEmails - classified);
+        var classified = ruleClassified + aiClassified;
+        var unclassified = Math.Max(0, totalEmails - classified);
 
         return new ClassificationSummary(
             TotalEmails: totalEmails,

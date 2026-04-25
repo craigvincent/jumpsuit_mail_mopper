@@ -55,12 +55,10 @@ public class ResetCommand : AsyncCommand
             return 1;
         }
 
-        int deleted = 0;
-        int failed = 0;
-
-        await AnsiConsole.Status()
+        var (deleted, failed) = await AnsiConsole.Status()
             .StartAsync("Deleting local data...", async _ =>
             {
+                int d = 0, f = 0;
                 foreach (var (label, path) in items)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -70,20 +68,21 @@ public class ResetCommand : AsyncCommand
                         if (Directory.Exists(path))
                         {
                             Directory.Delete(path, recursive: true);
-                            deleted++;
+                            d++;
                         }
                         else if (File.Exists(path))
                         {
                             File.Delete(path);
-                            deleted++;
+                            d++;
                         }
                     }
                     catch (Exception ex)
                     {
-                        failed++;
+                        f++;
                         AnsiConsole.MarkupLine($"[red]✗[/] {Markup.Escape(label)}: {Markup.Escape(ex.Message)}");
                     }
                 }
+                return (d, f);
             });
 
         AnsiConsole.WriteLine();

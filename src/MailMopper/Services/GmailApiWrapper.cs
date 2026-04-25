@@ -15,10 +15,8 @@ public class GmailApiWrapper : IGmailApi
         _session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
-    private GmailService GetGmailService()
-    {
-        return _session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
-    }
+    private GmailService GetGmailService() =>
+        _session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
 
     public async Task BatchModifyAsync(IList<string> messageIds, IList<string>? addLabelIds, IList<string>? removeLabelIds, CancellationToken ct)
     {

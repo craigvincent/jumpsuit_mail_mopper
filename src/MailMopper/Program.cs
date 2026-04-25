@@ -5,6 +5,7 @@ using MailMopper.Infrastructure;
 using MailMopper.Services;
 using MailMopper.Tui;
 using Microsoft.Extensions.DependencyInjection;
+using Spectre.Console;
 using Spectre.Console.Cli;
 
 var version = typeof(Program).Assembly
@@ -33,6 +34,7 @@ services.AddTransient<DatabaseService>();
 services.AddTransient<ModelTrainerService>();
 services.AddTransient<ReviewApp>();
 services.AddTransient<GmailFetchService>();
+services.AddTransient<GmailServices>();
 services.AddTransient<IGmailApi, GmailApiWrapper>();
 services.AddTransient<ActionService>();
 
@@ -76,5 +78,27 @@ app.Configure(config =>
     config.AddCommand<ResetCommand>("reset")
         .WithDescription("Wipe all local data and start fresh");
 });
+
+if (args.Length == 0 || args[0] is "-h" or "--help" or "-?" or "/?")
+{
+    AnsiConsole.Write(new Markup(@"[bold blue]8888ba.88ba           oo dP
+88  `8b  `8b             88
+88   88   88 .d8888b. dP 88
+88   88   88 88'  `88 88 88
+88   88   88 88.  .88 88 88
+dP   dP   dP `88888P8 dP dP
+
+
+8888ba.88ba
+88  `8b  `8b
+88   88   88 .d8888b. 88d888b. 88d888b. .d8888b. 88d888b.
+88   88   88 88'  `88 88'  `88 88'  `88 88ooood8 88'  `88
+88   88   88 88.  .88 88.  .88 88.  .88 88.  ... 88
+dP   dP   dP `88888P' 88Y888P' 88Y888P' `88888P' dP
+                      88       88
+                      dP       dP
+[/]"));
+    AnsiConsole.WriteLine();
+}
 
 return await app.RunAsync(args);

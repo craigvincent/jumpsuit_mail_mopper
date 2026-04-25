@@ -19,7 +19,16 @@ public partial class ReviewApp
         AnsiConsole.WriteLine();
 
         RenderYearBreakdown();
+        RenderDashboardTable();
+        RenderDashboardSummary();
 
+        var input = ReadCommand("[blue]Dashboard: [/]", "SQY");
+
+        return string.IsNullOrWhiteSpace(input) || await HandleDashboardInputAsync(input, ct);
+    }
+
+    private void RenderDashboardTable()
+    {
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn(new TableColumn("[bold]#[/]").RightAligned())
@@ -30,7 +39,7 @@ public partial class ReviewApp
             .AddColumn("[bold]Top Domain[/]")
             .AddColumn("[bold]Progress[/]");
 
-        for (int i = 0; i < _groups.Count; i++)
+        for (var i = 0; i < _groups.Count; i++)
         {
             var g = _groups[i];
             var count = g.Classifications.Count;
@@ -42,17 +51,7 @@ public partial class ReviewApp
                 .FirstOrDefault()?.Key ?? "-";
 
             var decided = g.Classifications.Count(c => c.ReviewDecision != ReviewDecision.Pending);
-            var progressText = decided == count
-                ? g.Decision switch
-                {
-                    ReviewDecision.ApproveTrash => "[red]✗ Trash[/]",
-                    ReviewDecision.Keep => "[green]✓ Keep[/]",
-                    ReviewDecision.Whitelisted => "[cyan]✓ Whitelisted[/]",
-                    _ => "[green]✓ Done[/]"
-                }
-                : decided > 0
-                    ? $"[yellow]{decided}/{count} reviewed[/]"
-                    : "[dim]Not started[/]";
+            var progressText = BuildCategoryProgressText(g, decided, count);
 
             table.AddRow(
                 $"[bold]{i + 1}[/]",
@@ -65,12 +64,30 @@ public partial class ReviewApp
         }
 
         AnsiConsole.Write(table);
+    }
 
+    private static string BuildCategoryProgressText(ClassificationGroup g, int decided, int count)
+    {
+        if (decided == count)
+            return g.Decision switch
+            {
+                ReviewDecision.ApproveTrash => "[red]\u2717 Trash[/]",
+                ReviewDecision.Keep => "[green]\u2713 Keep[/]",
+                ReviewDecision.Whitelisted => "[cyan]\u2713 Whitelisted[/]",
+                _ => "[green]\u2713 Done[/]"
+            };
+        if (decided > 0)
+            return $"[yellow]{decided}/{count} reviewed[/]";
+        return "[dim]Not started[/]";
+    }
+
+    private void RenderDashboardSummary()
+    {
         var totalRemaining = _groups.Sum(g => g.Classifications.Count);
-        var totalRemainingSize = _groups.Sum(g => g.Classifications.Sum(c => c.Email?.SizeEstimate ?? 0));
-        var totalPendingEmails = _groups.Sum(g => g.Classifications.Count(c => c.ReviewDecision == ReviewDecision.Pending));
-        var totalTrashEmails = _groups.Sum(g => g.Classifications.Count(c => c.ReviewDecision == ReviewDecision.ApproveTrash));
-        var totalKeepEmails = _groups.Sum(g => g.Classifications.Count(c => c.ReviewDecision == ReviewDecision.Keep));
+        var totalRemainingSize = _groups.Sum(static (ClassificationGroup g) => g.Classifications.Sum(static (Classification c) => c.Email?.SizeEstimate ?? 0));
+        var totalPendingEmails = _groups.Sum(static (ClassificationGroup g) => g.Classifications.Count(static (Classification c) => c.ReviewDecision == ReviewDecision.Pending));
+        var totalTrashEmails = _groups.Sum(static (ClassificationGroup g) => g.Classifications.Count(static (Classification c) => c.ReviewDecision == ReviewDecision.ApproveTrash));
+        var totalKeepEmails = _groups.Sum(static (ClassificationGroup g) => g.Classifications.Count(static (Classification c) => c.ReviewDecision == ReviewDecision.Keep));
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"  [bold]Total:[/] {totalRemaining:N0} emails ({FormatSize(totalRemainingSize)})");
@@ -89,12 +106,10 @@ public partial class ReviewApp
             "[dim]Q[/]=quit"
         };
         AnsiConsole.MarkupLine($"  {string.Join("  │  ", navHints)}");
+    }
 
-        var input = ReadCommand("[blue]Dashboard: [/]", "SQY");
-
-        if (string.IsNullOrWhiteSpace(input))
-            return true;
-
+    private async Task<bool> HandleDashboardInputAsync(string input, CancellationToken ct)
+    {
         if (input.Equals("S", StringComparison.OrdinalIgnoreCase))
         {
             if (_dirty)
@@ -106,13 +121,10 @@ public partial class ReviewApp
         }
         if (input.Equals("Q", StringComparison.OrdinalIgnoreCase))
         {
-            if (_dirty)
+            if (_dirty && AnsiConsole.Confirm("[yellow]You have unsaved changes. Save before quitting?[/]", defaultValue: true))
             {
-                if (AnsiConsole.Confirm("[yellow]You have unsaved changes. Save before quitting?[/]", defaultValue: true))
-                {
-                    await SaveAsync(ct);
-                    AnsiConsole.MarkupLine("[green]✓ Saved.[/]");
-                }
+                await SaveAsync(ct);
+                AnsiConsole.MarkupLine("[green]✓ Saved.[/]");
             }
             return false;
         }

@@ -12,23 +12,15 @@ public sealed class TypeRegistrar : ITypeRegistrar
         _builder = builder ?? throw new ArgumentNullException(nameof(builder));
     }
 
-    public ITypeResolver Build()
-    {
-        return new TypeResolver(_builder.BuildServiceProvider());
-    }
+    public ITypeResolver Build() =>
+        new TypeResolver(_builder.BuildServiceProvider());
 
-    public void Register(Type service, Type implementation)
-    {
+    public void Register(Type service, Type implementation) =>
         _builder.AddSingleton(service, implementation);
-    }
 
-    public void RegisterInstance(Type service, object implementation)
-    {
+    public void RegisterInstance(Type service, object implementation) =>
         _builder.AddSingleton(service, implementation);
-    }
 
-    public void RegisterLazy(Type service, Func<object> factory)
-    {
+    public void RegisterLazy(Type service, Func<object> factory) =>
         _builder.AddSingleton(service, _ => factory());
-    }
 }
