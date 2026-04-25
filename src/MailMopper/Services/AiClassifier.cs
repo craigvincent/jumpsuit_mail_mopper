@@ -34,9 +34,9 @@ public class MlClassifier : IDisposable
     }
 
     /// <summary>
-    /// Classifies a batch of emails using the trained ML model.
+    /// Classifies a batch of emails using the trained ML model (CPU-bound, synchronous).
     /// </summary>
-    public Task<IReadOnlyList<AiClassificationResult>> ClassifyBatchAsync(
+    public IReadOnlyList<AiClassificationResult> ClassifyBatch(
         IReadOnlyList<EmailRecord> emails,
         CancellationToken ct)
     {
@@ -67,7 +67,7 @@ public class MlClassifier : IDisposable
             results.Add(new AiClassificationResult(email.MessageId, category, confidence, reasoning));
         }
 
-        return Task.FromResult<IReadOnlyList<AiClassificationResult>>(results.AsReadOnly());
+        return results.AsReadOnly();
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ public class MlClassifier : IDisposable
 
             Console.WriteLine($"  [Batch {batchIndex + 1}/{totalBatches}] Classifying {batchEmails.Count} emails...");
 
-            var batchResults = await ClassifyBatchAsync(batchEmails, ct);
+            var batchResults = ClassifyBatch(batchEmails, ct);
             processedCount += batchEmails.Count;
 
             if (onBatchComplete != null)

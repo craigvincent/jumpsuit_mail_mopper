@@ -46,6 +46,8 @@ public class ModelTrainerService
         var mlContext = new MLContext(seed: 42);
         var dataView = mlContext.Data.LoadFromEnumerable(trainingData);
 
+        var categories = trainingData.Select(t => t.Label).Distinct().OrderBy(l => l).ToList();
+
         // Build the ML pipeline
         var pipeline = mlContext.Transforms.Text.FeaturizeText("FromFeatures", nameof(EmailFeature.From))
             .Append(mlContext.Transforms.Text.FeaturizeText("SubjectFeatures", nameof(EmailFeature.Subject)))
@@ -68,8 +70,8 @@ public class ModelTrainerService
         var bestFold = cvResults.OrderByDescending(r => r.Metrics.MacroAccuracy).First();
         var perClassMetrics = new Dictionary<string, (double Precision, double Recall, double F1)>();
         var confusionMatrix = bestFold.Metrics.ConfusionMatrix;
-        var classNames = confusionMatrix.PerClassPrecision.Select((_, i) => i < trainingData.Select(t => t.Label).Distinct().OrderBy(l => l).ToList().Count
-            ? trainingData.Select(t => t.Label).Distinct().OrderBy(l => l).ToList()[i]
+        var classNames = confusionMatrix.PerClassPrecision.Select((_, i) => i < categories.Count
+            ? categories[i]
             : $"Class{i}").ToList();
 
         for (int i = 0; i < confusionMatrix.PerClassPrecision.Count; i++)
@@ -96,7 +98,7 @@ public class ModelTrainerService
 
         return new TrainingResult(
             TrainingSamples: trainingData.Count,
-            Categories: trainingData.Select(t => t.Label).Distinct().OrderBy(l => l).ToList(),
+            Categories: categories,
             Accuracy: avgAccuracy,
             LogLoss: avgLogLoss,
             PerClassMetrics: perClassMetrics,

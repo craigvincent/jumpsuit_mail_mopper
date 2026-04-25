@@ -16,6 +16,9 @@ public class EmailFeature
     [LoadColumn(2)]
     public string Snippet { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Training-only label column. Not populated during prediction.
+    /// </summary>
     [LoadColumn(3)]
     public string Label { get; set; } = string.Empty;
 
