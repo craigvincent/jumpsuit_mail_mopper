@@ -11,24 +11,28 @@ public class StatsCommand : AsyncCommand
 {
     private readonly DatabaseService _databaseService;
     private readonly AppDbContext _dbContext;
+    private readonly AppCancellation _cancellation;
 
-    public StatsCommand(DatabaseService databaseService, AppDbContext dbContext)
+    public StatsCommand(DatabaseService databaseService, AppDbContext dbContext, AppCancellation cancellation)
     {
         _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]Statistics[/]");
 
-            await _dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // Get stats and category summary
-            var stats = await _databaseService.GetStatsAsync(CancellationToken.None);
-            var categorySummary = await _databaseService.GetCategorySummaryAsync(CancellationToken.None);
+            var stats = await _databaseService.GetStatsAsync(ct);
+            var categorySummary = await _databaseService.GetCategorySummaryAsync(ct);
 
             // Display overall stats
             var statsTable = new Table();
@@ -76,7 +80,7 @@ public class StatsCommand : AsyncCommand
                 .Select(g => new { Sender = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .Take(10)
-                .ToListAsync(CancellationToken.None);
+                .ToListAsync(ct);
 
             if (topSenders.Count > 0)
             {

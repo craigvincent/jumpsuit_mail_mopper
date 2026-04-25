@@ -9,21 +9,25 @@ public class TrainCommand : AsyncCommand
 {
     private readonly ModelTrainerService _trainer;
     private readonly AppDbContext _dbContext;
+    private readonly AppCancellation _cancellation;
 
-    public TrainCommand(ModelTrainerService trainer, AppDbContext dbContext)
+    public TrainCommand(ModelTrainerService trainer, AppDbContext dbContext, AppCancellation cancellation)
     {
         _trainer = trainer ?? throw new ArgumentNullException(nameof(trainer));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]=== Train Email Classifier ===[/]");
             AnsiConsole.WriteLine();
 
-            await _dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             var modelPath = ModelTrainerService.GetDefaultModelPath();
 
@@ -38,7 +42,7 @@ public class TrainCommand : AsyncCommand
             var result = await _trainer.TrainAsync(
                 modelPath,
                 onStatus: msg => AnsiConsole.MarkupLine($"  {Markup.Escape(msg)}"),
-                CancellationToken.None);
+                ct);
 
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[green]✓ Training complete![/]");

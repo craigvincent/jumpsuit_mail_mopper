@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Globalization;
-using MailMopper.Config;
 using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
@@ -20,29 +19,33 @@ public class UndoCommand : AsyncCommand<UndoSettings>
 {
     private readonly DatabaseService _databaseService;
     private readonly GmailAuthService _authService;
+    private readonly ActionService _actionService;
     private readonly AppDbContext _dbContext;
-    private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
 
-    public UndoCommand(DatabaseService databaseService, GmailAuthService authService, AppDbContext dbContext, AppSettings appSettings)
+    public UndoCommand(DatabaseService databaseService, GmailAuthService authService, ActionService actionService, AppDbContext dbContext, AppCancellation cancellation)
     {
         _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService));
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _actionService = actionService ?? throw new ArgumentNullException(nameof(actionService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, UndoSettings settings)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]Undo Actions[/]");
 
-            await _dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // If no session ID, list available sessions
             if (string.IsNullOrWhiteSpace(settings.SessionId))
             {
-                var sessions = await _databaseService.GetSessionsAsync(CancellationToken.None);
+                var sessions = await _databaseService.GetSessionsAsync(ct);
 
                 if (!sessions.Any())
                 {
@@ -72,18 +75,16 @@ public class UndoCommand : AsyncCommand<UndoSettings>
             }
 
             // Undo specific session
-            var gmail = await AnsiConsole.Status()
+            await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await _authService.AuthenticateAsync(CancellationToken.None);
+                    await _authService.AuthenticateAsync(ct);
                 });
-
-            var actionService = new ActionService(new GmailApiWrapper(gmail), _dbContext, _appSettings);
 
             // Get count of actions for this session
             var actionCount = await _dbContext.Actions
                 .Where(a => a.SessionId == settings.SessionId && a.Action == "trash")
-                .CountAsync(CancellationToken.None);
+                .CountAsync(ct);
 
             if (actionCount == 0)
             {
@@ -113,7 +114,7 @@ public class UndoCommand : AsyncCommand<UndoSettings>
                         if (p.total > 0)
                             task.Value = (double)p.processed / p.total * 100;
                     });
-                    restored = await actionService.UndoSessionAsync(settings.SessionId, progress, CancellationToken.None);
+                    restored = await _actionService.UndoSessionAsync(settings.SessionId, progress, ct);
                 });
 
             AnsiConsole.MarkupLine("[green]✓ Undo complete![/]");

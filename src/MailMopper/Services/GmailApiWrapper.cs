@@ -10,9 +10,10 @@ public class GmailApiWrapper : IGmailApi
 {
     private readonly GmailService _gmail;
 
-    public GmailApiWrapper(GmailService gmail)
+    public GmailApiWrapper(GmailSession session)
     {
-        _gmail = gmail ?? throw new ArgumentNullException(nameof(gmail));
+        ArgumentNullException.ThrowIfNull(session);
+        _gmail = session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
     }
 
     public async Task BatchModifyAsync(IList<string> messageIds, IList<string>? addLabelIds, IList<string>? removeLabelIds, CancellationToken ct)

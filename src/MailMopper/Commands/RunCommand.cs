@@ -23,39 +23,46 @@ public class RunSettings : CommandSettings
 public class RunCommand : AsyncCommand<RunSettings>
 {
     private readonly GmailAuthService _authService;
+    private readonly GmailFetchService _fetchService;
     private readonly RuleClassifier _ruleClassifier;
     private readonly ReviewApp _reviewApp;
+    private readonly ActionService _actionService;
     private readonly AppDbContext _dbContext;
     private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
 
-    public RunCommand(GmailAuthService authService, RuleClassifier ruleClassifier, ReviewApp reviewApp, AppDbContext dbContext, AppSettings appSettings)
+    public RunCommand(GmailAuthService authService, GmailFetchService fetchService, RuleClassifier ruleClassifier, ReviewApp reviewApp, ActionService actionService, AppDbContext dbContext, AppSettings appSettings, AppCancellation cancellation)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _fetchService = fetchService ?? throw new ArgumentNullException(nameof(fetchService));
         _ruleClassifier = ruleClassifier ?? throw new ArgumentNullException(nameof(ruleClassifier));
         _reviewApp = reviewApp ?? throw new ArgumentNullException(nameof(reviewApp));
+        _actionService = actionService ?? throw new ArgumentNullException(nameof(actionService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, RunSettings settings)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]Gmail Cleanup - Full Pipeline[/]");
 
-            await _dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // Step 1: Authenticate
             AnsiConsole.MarkupLine("\n[bold]Step 1: Authentication[/]");
-            var gmail = await AnsiConsole.Status()
+            await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await _authService.AuthenticateAsync(CancellationToken.None);
+                    await _authService.AuthenticateAsync(ct);
                 });
 
             // Step 2: Fetch
             AnsiConsole.MarkupLine("\n[bold]Step 2: Fetching Emails[/]");
-            var fetchService = new GmailFetchService(gmail, _dbContext, _appSettings);
             int totalFetched = 0;
 
             await AnsiConsole.Progress()
@@ -67,7 +74,7 @@ public class RunCommand : AsyncCommand<RunSettings>
                         if (p.total > 0)
                             task.Value = (double)p.fetched / p.total * 100;
                     });
-                    totalFetched = await fetchService.FetchIncrementalAsync(progress, CancellationToken.None);
+                    totalFetched = await _fetchService.FetchIncrementalAsync(progress, ct);
                 });
 
             AnsiConsole.MarkupLine($"[green]✓ Fetched {totalFetched} email(s)[/]");
@@ -91,7 +98,7 @@ public class RunCommand : AsyncCommand<RunSettings>
             summary = await pipeline.RunAsync(
                 settings.SkipMl,
                 onStatus: msg => Console.WriteLine($"  {msg}"),
-                CancellationToken.None);
+                ct);
 
             AnsiConsole.MarkupLine($"[green]✓ Classified {(summary?.RuleClassified ?? 0) + (summary?.MlClassified ?? 0)} email(s)[/]");
 
@@ -100,7 +107,7 @@ public class RunCommand : AsyncCommand<RunSettings>
                 .GroupBy(c => c.Category)
                 .Select(g => new { Category = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
-                .ToListAsync(CancellationToken.None);
+                .ToListAsync(ct);
 
             var table = new Table();
             table.AddColumn("[bold]Category[/]");
@@ -116,7 +123,7 @@ public class RunCommand : AsyncCommand<RunSettings>
             // Step 4: Review
             AnsiConsole.MarkupLine("\n[bold]Step 4: Review (Interactive)[/]");
             AnsiConsole.MarkupLine("[yellow]Starting review interface...[/]");
-            await _reviewApp.RunAsync(CancellationToken.None);
+            await _reviewApp.RunAsync(ct);
 
             AnsiConsole.MarkupLine("[green]✓ Review complete![/]");
 
@@ -125,7 +132,7 @@ public class RunCommand : AsyncCommand<RunSettings>
 
             var approvedCount = await _dbContext.Classifications
                 .Where(c => c.ReviewDecision == Models.ReviewDecision.ApproveTrash)
-                .CountAsync(CancellationToken.None);
+                .CountAsync(ct);
 
             if (approvedCount == 0)
             {
@@ -148,7 +155,6 @@ public class RunCommand : AsyncCommand<RunSettings>
                 return 0;
             }
 
-            var actionService = new ActionService(new GmailApiWrapper(gmail), _dbContext, _appSettings);
             ActionSummary? actionResult = null;
 
             await AnsiConsole.Progress()
@@ -160,7 +166,7 @@ public class RunCommand : AsyncCommand<RunSettings>
                         if (p.total > 0)
                             task.Value = (double)p.processed / p.total * 100;
                     });
-                    actionResult = await actionService.TrashApprovedAsync(false, progress, CancellationToken.None);
+                    actionResult = await _actionService.TrashApprovedAsync(false, progress, ct);
                 });
 
             AnsiConsole.MarkupLine("[green]✓ Pipeline complete![/]");

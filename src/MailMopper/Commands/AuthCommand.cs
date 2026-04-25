@@ -8,16 +8,22 @@ namespace MailMopper.Commands;
 public class AuthCommand : AsyncCommand
 {
     private readonly GmailAuthService _authService;
+    private readonly GmailSession _session;
     private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
 
-    public AuthCommand(GmailAuthService authService, AppSettings appSettings)
+    public AuthCommand(GmailAuthService authService, GmailSession session, AppSettings appSettings, AppCancellation cancellation)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
+        var ct = _cancellation.Token;
+
         AnsiConsole.MarkupLine("[bold blue]Gmail Authentication Setup[/]");
         AnsiConsole.MarkupLine($"Looking for credentials at: [yellow]{_appSettings.Gmail.CredentialsPath}[/]");
 
@@ -34,8 +40,9 @@ public class AuthCommand : AsyncCommand
         await AnsiConsole.Status()
             .StartAsync("Authenticating with Gmail...", async ctx =>
             {
-                var gmail = await _authService.AuthenticateAsync(CancellationToken.None);
-                var profile = await gmail.Users.GetProfile("me").ExecuteAsync();
+                await _authService.AuthenticateAsync(ct);
+                var gmail = _session.Service!;
+                var profile = await gmail.Users.GetProfile("me").ExecuteAsync(ct);
                 AnsiConsole.MarkupLine($"[green]✓[/] Authenticated as: [bold]{profile.EmailAddress}[/]");
                 AnsiConsole.MarkupLine($"[green]✓[/] Total messages: [bold]{profile.MessagesTotal}[/]");
             });

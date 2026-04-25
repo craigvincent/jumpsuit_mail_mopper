@@ -12,13 +12,15 @@ public class GmailFetchService
     private readonly GmailService _gmailService;
     private readonly AppDbContext _dbContext;
     private readonly AppSettings _appSettings;
+    private readonly GmailSession _session;
 
     public GmailFetchService(
-        GmailService gmailService,
+        GmailSession session,
         AppDbContext dbContext,
         AppSettings appSettings)
     {
-        _gmailService = gmailService ?? throw new ArgumentNullException(nameof(gmailService));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _gmailService = session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
     }
@@ -57,55 +59,8 @@ public class GmailFetchService
         Console.WriteLine($"Found {allMessageIds.Count} total messages, {newMessageIds.Count} new to fetch.");
 
         // Step 2: Fetch message details in sequential batches with rate limiting
-        int fetchedCount = 0;
-        int savedCount = 0;
-        var pendingRecords = new List<EmailRecord>();
-        int batchSize = _appSettings.Gmail.BatchSize; // default 100
-
-        for (int i = 0; i < newMessageIds.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            try
-            {
-                var getRequest = _gmailService.Users.Messages.Get("me", newMessageIds[i]);
-                getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
-                getRequest.MetadataHeaders = new[] { "From", "To", "Subject", "Date", "List-Unsubscribe" };
-
-                var message = await getRequest.ExecuteAsync(ct);
-                pendingRecords.Add(ParseEmailRecord(message));
-            }
-            catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.TooManyRequests
-                || ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                // Rate limited — wait and retry
-                Console.WriteLine($"Rate limited at message {i + 1}. Waiting 60 seconds...");
-                await Task.Delay(TimeSpan.FromSeconds(60), ct);
-                i--; // retry this message
-                continue;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching message {newMessageIds[i]}: {ex.Message}");
-            }
-
-            fetchedCount++;
-            progress?.Report((existingIds.Count + fetchedCount, allMessageIds.Count));
-
-            // Save to DB in batches
-            if (pendingRecords.Count >= batchSize)
-            {
-                savedCount += await SaveBatchAsync(pendingRecords, ct);
-                pendingRecords.Clear();
-
-                // Small delay between batches to stay under rate limits
-                await Task.Delay(200, ct);
-            }
-        }
-
-        // Save any remaining records
-        if (pendingRecords.Count > 0)
-            savedCount += await SaveBatchAsync(pendingRecords, ct);
+        int savedCount = await FetchAndSaveMessagesAsync(
+            newMessageIds, progress, existingIds.Count, allMessageIds.Count, ct);
 
         // Update SyncState
         await UpdateSyncStateAsync(savedCount, ct);
@@ -181,17 +136,42 @@ public class GmailFetchService
         }
 
         // Fetch sequentially with rate limiting
+        int savedCount = await FetchAndSaveMessagesAsync(
+            newMessageIds, progress, 0, newMessageIds.Count, ct);
+
+        // Update SyncState
+        lastSync.TotalMessagesFetched += savedCount;
+        lastSync.LastSyncAt = DateTimeOffset.UtcNow;
+        _dbContext.SyncStates.Update(lastSync);
+        await _dbContext.SaveChangesAsync(ct);
+
+        Console.WriteLine($"Incremental fetch complete. New emails: {savedCount}");
+        return savedCount;
+    }
+
+    /// <summary>
+    /// Core message fetching loop: fetches individual message details from Gmail,
+    /// parsing headers and saving in batches. Shared by full and incremental fetches.
+    /// </summary>
+    private async Task<int> FetchAndSaveMessagesAsync(
+        List<string> messageIds,
+        IProgress<(int fetched, int total)>? progress,
+        int progressOffset,
+        int progressTotal,
+        CancellationToken ct)
+    {
         int fetchedCount = 0;
         int savedCount = 0;
         var pendingRecords = new List<EmailRecord>();
+        int batchSize = _appSettings.Gmail.BatchSize;
 
-        for (int i = 0; i < newMessageIds.Count; i++)
+        for (int i = 0; i < messageIds.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
 
             try
             {
-                var getRequest = _gmailService.Users.Messages.Get("me", newMessageIds[i]);
+                var getRequest = _gmailService.Users.Messages.Get("me", messageIds[i]);
                 getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
                 getRequest.MetadataHeaders = new[] { "From", "To", "Subject", "Date", "List-Unsubscribe" };
 
@@ -208,13 +188,13 @@ public class GmailFetchService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching message {newMessageIds[i]}: {ex.Message}");
+                Console.WriteLine($"Error fetching message {messageIds[i]}: {ex.Message}");
             }
 
             fetchedCount++;
-            progress?.Report((fetchedCount, newMessageIds.Count));
+            progress?.Report((progressOffset + fetchedCount, progressTotal));
 
-            if (pendingRecords.Count >= _appSettings.Gmail.BatchSize)
+            if (pendingRecords.Count >= batchSize)
             {
                 savedCount += await SaveBatchAsync(pendingRecords, ct);
                 pendingRecords.Clear();
@@ -225,13 +205,6 @@ public class GmailFetchService
         if (pendingRecords.Count > 0)
             savedCount += await SaveBatchAsync(pendingRecords, ct);
 
-        // Update SyncState
-        lastSync.TotalMessagesFetched += savedCount;
-        lastSync.LastSyncAt = DateTimeOffset.UtcNow;
-        _dbContext.SyncStates.Update(lastSync);
-        await _dbContext.SaveChangesAsync(ct);
-
-        Console.WriteLine($"Incremental fetch complete. New emails: {savedCount}");
         return savedCount;
     }
 

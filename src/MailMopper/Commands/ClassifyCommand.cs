@@ -21,21 +21,25 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
     private readonly RuleClassifier _ruleClassifier;
     private readonly AppDbContext _dbContext;
     private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
 
-    public ClassifyCommand(RuleClassifier ruleClassifier, AppDbContext dbContext, AppSettings appSettings)
+    public ClassifyCommand(RuleClassifier ruleClassifier, AppDbContext dbContext, AppSettings appSettings, AppCancellation cancellation)
     {
         _ruleClassifier = ruleClassifier ?? throw new ArgumentNullException(nameof(ruleClassifier));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, ClassifySettings settings)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             Console.WriteLine("=== Email Classification ===");
 
-            await _dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // Try to load ML model if not skipping
             using MlClassifier? mlClassifier = !settings.SkipMl
@@ -44,8 +48,8 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
 
             var pipeline = new ClassificationPipeline(_ruleClassifier, mlClassifier, _dbContext, _appSettings);
 
-            var totalEmails = await _dbContext.Emails.CountAsync();
-            var classifiedCount = await _dbContext.Classifications.CountAsync();
+            var totalEmails = await _dbContext.Emails.CountAsync(ct);
+            var classifiedCount = await _dbContext.Classifications.CountAsync(ct);
             var unclassifiedCount = totalEmails - classifiedCount;
 
             Console.WriteLine($"  {unclassifiedCount} emails to classify");
@@ -55,7 +59,7 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
             var summary = await pipeline.RunAsync(
                 settings.SkipMl,
                 onStatus: msg => Console.WriteLine($"  {msg}"),
-                CancellationToken.None);
+                ct);
 
             Console.WriteLine();
 
@@ -64,7 +68,7 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
                 .GroupBy(c => c.Category)
                 .Select(g => new { Category = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
-                .ToListAsync(CancellationToken.None);
+                .ToListAsync(ct);
 
             // Display results with Spectre table (safe — pipeline is done)
             AnsiConsole.MarkupLine("[green]✓ Classification complete![/]");

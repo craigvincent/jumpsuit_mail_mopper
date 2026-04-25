@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using MailMopper.Config;
 using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
@@ -22,28 +21,32 @@ public class ExecuteSettings : CommandSettings
 public class ExecuteCommand : AsyncCommand<ExecuteSettings>
 {
     private readonly GmailAuthService _authService;
+    private readonly ActionService _actionService;
     private readonly AppDbContext _dbContext;
-    private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
 
-    public ExecuteCommand(GmailAuthService authService, AppDbContext dbContext, AppSettings appSettings)
+    public ExecuteCommand(GmailAuthService authService, ActionService actionService, AppDbContext dbContext, AppCancellation cancellation)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _actionService = actionService ?? throw new ArgumentNullException(nameof(actionService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, ExecuteSettings settings)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]Execute Actions[/]");
 
-            await _dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // Count approved-for-trash classifications
             var approvedCount = await _dbContext.Classifications
                 .Where(c => c.ReviewDecision == Models.ReviewDecision.ApproveTrash)
-                .CountAsync(CancellationToken.None);
+                .CountAsync(ct);
 
             if (approvedCount == 0)
             {
@@ -72,13 +75,11 @@ public class ExecuteCommand : AsyncCommand<ExecuteSettings>
             }
 
             // Authenticate
-            var gmail = await AnsiConsole.Status()
+            await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await _authService.AuthenticateAsync(CancellationToken.None);
+                    await _authService.AuthenticateAsync(ct);
                 });
-
-            var actionService = new ActionService(new GmailApiWrapper(gmail), _dbContext, _appSettings);
 
             // Execute with progress
             ActionSummary? result = null;
@@ -92,7 +93,7 @@ public class ExecuteCommand : AsyncCommand<ExecuteSettings>
                         if (p.total > 0)
                             task.Value = (double)p.processed / p.total * 100;
                     });
-                    result = await actionService.TrashApprovedAsync(settings.DryRun, progress, CancellationToken.None);
+                    result = await _actionService.TrashApprovedAsync(settings.DryRun, progress, ct);
                 });
 
             AnsiConsole.MarkupLine("[green]✓ Execution complete![/]");

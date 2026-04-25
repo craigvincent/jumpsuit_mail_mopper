@@ -1,4 +1,3 @@
-using MailMopper.Config;
 using MailMopper.Data;
 using MailMopper.Services;
 using Spectre.Console;
@@ -9,37 +8,39 @@ namespace MailMopper.Commands;
 public class RepairDatesCommand : AsyncCommand
 {
     private readonly GmailAuthService _authService;
+    private readonly GmailFetchService _fetchService;
     private readonly AppDbContext _dbContext;
-    private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
 
-    public RepairDatesCommand(GmailAuthService authService, AppDbContext dbContext, AppSettings appSettings)
+    public RepairDatesCommand(GmailAuthService authService, GmailFetchService fetchService, AppDbContext dbContext, AppCancellation cancellation)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _fetchService = fetchService ?? throw new ArgumentNullException(nameof(fetchService));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]Repair Email Dates[/]");
             AnsiConsole.MarkupLine("[dim]Fixes emails whose date was incorrectly set to fetch time.[/]");
             AnsiConsole.WriteLine();
 
-            await _dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
-            var gmail = await AnsiConsole.Status()
+            await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await _authService.AuthenticateAsync(CancellationToken.None);
+                    await _authService.AuthenticateAsync(ct);
                 });
 
-            var fetchService = new GmailFetchService(gmail, _dbContext, _appSettings);
-
-            var repaired = await fetchService.RepairDatesAsync(
+            var repaired = await _fetchService.RepairDatesAsync(
                 onStatus: msg => AnsiConsole.MarkupLine($"  {Markup.Escape(msg)}"),
-                CancellationToken.None);
+                ct);
 
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine($"[green]✓ Repaired {repaired} email date(s).[/]");

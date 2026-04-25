@@ -9,10 +9,12 @@ namespace MailMopper.Services;
 public class GmailAuthService
 {
     private readonly AppSettings _settings;
+    private readonly GmailSession _session;
 
-    public GmailAuthService(AppSettings settings)
+    public GmailAuthService(AppSettings settings, GmailSession session)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
     public async Task<GmailService> AuthenticateAsync(CancellationToken ct)
@@ -60,6 +62,7 @@ public class GmailAuthService
             ApplicationName = "MailMopper"
         });
 
+        _session.Service = service;
         return service;
     }
 }

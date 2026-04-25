@@ -14,14 +14,27 @@ var version = typeof(Program).Assembly
 // Build service collection
 var services = new ServiceCollection();
 
+var cancellation = new AppCancellation();
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    Console.Error.WriteLine("\nCancellation requested. Finishing current operation...");
+    cancellation.Source.Cancel();
+};
+
 var appSettings = CommandHelper.LoadSettings();
 services.AddSingleton(appSettings);
+services.AddSingleton(cancellation);
+services.AddSingleton<GmailSession>();
 services.AddSingleton(_ => new AppDbContext());
 services.AddTransient<GmailAuthService>();
 services.AddTransient<RuleClassifier>();
 services.AddTransient<DatabaseService>();
 services.AddTransient<ModelTrainerService>();
 services.AddTransient<ReviewApp>();
+services.AddTransient<GmailFetchService>();
+services.AddTransient<IGmailApi, GmailApiWrapper>();
+services.AddTransient<ActionService>();
 
 var app = new CommandApp(new TypeRegistrar(services));
 
