@@ -1,3 +1,5 @@
+using MailMopper.Data;
+using MailMopper.Services;
 using MailMopper.Tui;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -6,19 +8,26 @@ namespace MailMopper.Commands;
 
 public class ReviewCommand : AsyncCommand
 {
+    private readonly ReviewApp _reviewApp;
+    private readonly AppDbContext _dbContext;
+    private readonly AppCancellation _cancellation;
+
+    public ReviewCommand(ReviewApp reviewApp, AppDbContext dbContext, AppCancellation cancellation)
+    {
+        _reviewApp = reviewApp ?? throw new ArgumentNullException(nameof(reviewApp));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Email Review[/]");
 
-            var dbContext = CommandHelper.CreateDbContext();
-            await using var _ = dbContext;
-            await dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(_cancellation.Token);
 
-            // Create and run review TUI
-            var reviewApp = new ReviewApp(dbContext);
-            await reviewApp.RunAsync(CancellationToken.None);
+            await _reviewApp.RunAsync(_cancellation.Token);
 
             AnsiConsole.MarkupLine("[green]✓ Review complete![/]");
 

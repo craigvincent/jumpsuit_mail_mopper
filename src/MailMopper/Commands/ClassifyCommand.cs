@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
+using MailMopper.Config;
+using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
@@ -16,27 +18,38 @@ public class ClassifySettings : CommandSettings
 
 public class ClassifyCommand : AsyncCommand<ClassifySettings>
 {
+    private readonly RuleClassifier _ruleClassifier;
+    private readonly AppDbContext _dbContext;
+    private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
+
+    public ClassifyCommand(RuleClassifier ruleClassifier, AppDbContext dbContext, AppSettings appSettings, AppCancellation cancellation)
+    {
+        _ruleClassifier = ruleClassifier ?? throw new ArgumentNullException(nameof(ruleClassifier));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context, ClassifySettings settings)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             Console.WriteLine("=== Email Classification ===");
 
-            var appSettings = CommandHelper.LoadSettings();
-            using var dbContext = CommandHelper.CreateDbContext();
-            await dbContext.Database.EnsureCreatedAsync();
-
-            var ruleClassifier = new RuleClassifier(appSettings);
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // Try to load ML model if not skipping
             using MlClassifier? mlClassifier = !settings.SkipMl
-                ? TryLoadMlClassifier(appSettings)
+                ? TryLoadMlClassifier(_appSettings)
                 : null;
 
-            var pipeline = new ClassificationPipeline(ruleClassifier, mlClassifier, dbContext, appSettings);
+            var pipeline = new ClassificationPipeline(_ruleClassifier, mlClassifier, _dbContext, _appSettings);
 
-            var totalEmails = await dbContext.Emails.CountAsync();
-            var classifiedCount = await dbContext.Classifications.CountAsync();
+            var totalEmails = await _dbContext.Emails.CountAsync(ct);
+            var classifiedCount = await _dbContext.Classifications.CountAsync(ct);
             var unclassifiedCount = totalEmails - classifiedCount;
 
             Console.WriteLine($"  {unclassifiedCount} emails to classify");
@@ -46,16 +59,16 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
             var summary = await pipeline.RunAsync(
                 settings.SkipMl,
                 onStatus: msg => Console.WriteLine($"  {msg}"),
-                CancellationToken.None);
+                ct);
 
             Console.WriteLine();
 
             // Get category breakdown
-            var categoryBreakdown = await dbContext.Classifications
+            var categoryBreakdown = await _dbContext.Classifications
                 .GroupBy(c => c.Category)
                 .Select(g => new { Category = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
-                .ToListAsync(CancellationToken.None);
+                .ToListAsync(ct);
 
             // Display results with Spectre table (safe — pipeline is done)
             AnsiConsole.MarkupLine("[green]✓ Classification complete![/]");
@@ -85,7 +98,7 @@ public class ClassifyCommand : AsyncCommand<ClassifySettings>
         }
     }
 
-    private static MlClassifier? TryLoadMlClassifier(Config.AppSettings appSettings)
+    private static MlClassifier? TryLoadMlClassifier(AppSettings appSettings)
     {
         var modelPath = appSettings.Ml?.ModelPath ?? ModelTrainerService.GetDefaultModelPath();
         if (File.Exists(modelPath))

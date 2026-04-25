@@ -9,19 +9,22 @@ namespace MailMopper.Services;
 
 public class GmailFetchService
 {
-    private readonly GmailService _gmailService;
     private readonly AppDbContext _dbContext;
     private readonly AppSettings _appSettings;
+    private readonly GmailSession _session;
 
     public GmailFetchService(
-        GmailService gmailService,
+        GmailSession session,
         AppDbContext dbContext,
         AppSettings appSettings)
     {
-        _gmailService = gmailService ?? throw new ArgumentNullException(nameof(gmailService));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
     }
+
+    private GmailService GetGmailService() =>
+        _session.Service ?? throw new InvalidOperationException("GmailSession not authenticated. Call AuthenticateAsync first.");
 
     /// <summary>
     /// Fetches all emails from Gmail and stores them in the local database.
@@ -36,7 +39,7 @@ public class GmailFetchService
 
         do
         {
-            var listRequest = _gmailService.Users.Messages.List("me");
+            var listRequest = GetGmailService().Users.Messages.List("me");
             listRequest.MaxResults = 500;
             if (pageToken != null)
                 listRequest.PageToken = pageToken;
@@ -57,55 +60,8 @@ public class GmailFetchService
         Console.WriteLine($"Found {allMessageIds.Count} total messages, {newMessageIds.Count} new to fetch.");
 
         // Step 2: Fetch message details in sequential batches with rate limiting
-        int fetchedCount = 0;
-        int savedCount = 0;
-        var pendingRecords = new List<EmailRecord>();
-        int batchSize = _appSettings.Gmail.BatchSize; // default 100
-
-        for (int i = 0; i < newMessageIds.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            try
-            {
-                var getRequest = _gmailService.Users.Messages.Get("me", newMessageIds[i]);
-                getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
-                getRequest.MetadataHeaders = new[] { "From", "To", "Subject", "Date", "List-Unsubscribe" };
-
-                var message = await getRequest.ExecuteAsync(ct);
-                pendingRecords.Add(ParseEmailRecord(message));
-            }
-            catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.TooManyRequests
-                || ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                // Rate limited — wait and retry
-                Console.WriteLine($"Rate limited at message {i + 1}. Waiting 60 seconds...");
-                await Task.Delay(TimeSpan.FromSeconds(60), ct);
-                i--; // retry this message
-                continue;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching message {newMessageIds[i]}: {ex.Message}");
-            }
-
-            fetchedCount++;
-            progress?.Report((existingIds.Count + fetchedCount, allMessageIds.Count));
-
-            // Save to DB in batches
-            if (pendingRecords.Count >= batchSize)
-            {
-                savedCount += await SaveBatchAsync(pendingRecords, ct);
-                pendingRecords.Clear();
-
-                // Small delay between batches to stay under rate limits
-                await Task.Delay(200, ct);
-            }
-        }
-
-        // Save any remaining records
-        if (pendingRecords.Count > 0)
-            savedCount += await SaveBatchAsync(pendingRecords, ct);
+        int savedCount = await FetchAndSaveMessagesAsync(
+            newMessageIds, progress, existingIds.Count, allMessageIds.Count, ct);
 
         // Update SyncState
         await UpdateSyncStateAsync(savedCount, ct);
@@ -140,7 +96,7 @@ public class GmailFetchService
         {
             do
             {
-                var historyRequest = _gmailService.Users.History.List("me");
+                var historyRequest = GetGmailService().Users.History.List("me");
                 historyRequest.StartHistoryId = ulong.Parse(lastSync.LastHistoryId, System.Globalization.CultureInfo.InvariantCulture);
                 if (pageToken != null)
                     historyRequest.PageToken = pageToken;
@@ -181,17 +137,42 @@ public class GmailFetchService
         }
 
         // Fetch sequentially with rate limiting
-        int fetchedCount = 0;
-        int savedCount = 0;
-        var pendingRecords = new List<EmailRecord>();
+        var savedCount = await FetchAndSaveMessagesAsync(
+            newMessageIds, progress, 0, newMessageIds.Count, ct);
 
-        for (int i = 0; i < newMessageIds.Count; i++)
+        // Update SyncState
+        lastSync.TotalMessagesFetched += savedCount;
+        lastSync.LastSyncAt = DateTimeOffset.UtcNow;
+        _dbContext.SyncStates.Update(lastSync);
+        await _dbContext.SaveChangesAsync(ct);
+
+        Console.WriteLine($"Incremental fetch complete. New emails: {savedCount}");
+        return savedCount;
+    }
+
+    /// <summary>
+    /// Core message fetching loop: fetches individual message details from Gmail,
+    /// parsing headers and saving in batches. Shared by full and incremental fetches.
+    /// </summary>
+    private async Task<int> FetchAndSaveMessagesAsync(
+        List<string> messageIds,
+        IProgress<(int fetched, int total)>? progress,
+        int progressOffset,
+        int progressTotal,
+        CancellationToken ct)
+    {
+        var fetchedCount = 0;
+        var savedCount = 0;
+        var pendingRecords = new List<EmailRecord>();
+        var batchSize = _appSettings.Gmail.BatchSize;
+
+        for (var i = 0; i < messageIds.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
 
             try
             {
-                var getRequest = _gmailService.Users.Messages.Get("me", newMessageIds[i]);
+                var getRequest = GetGmailService().Users.Messages.Get("me", messageIds[i]);
                 getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
                 getRequest.MetadataHeaders = new[] { "From", "To", "Subject", "Date", "List-Unsubscribe" };
 
@@ -208,13 +189,13 @@ public class GmailFetchService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching message {newMessageIds[i]}: {ex.Message}");
+                Console.WriteLine($"Error fetching message {messageIds[i]}: {ex.Message}");
             }
 
             fetchedCount++;
-            progress?.Report((fetchedCount, newMessageIds.Count));
+            progress?.Report((progressOffset + fetchedCount, progressTotal));
 
-            if (pendingRecords.Count >= _appSettings.Gmail.BatchSize)
+            if (pendingRecords.Count >= batchSize)
             {
                 savedCount += await SaveBatchAsync(pendingRecords, ct);
                 pendingRecords.Clear();
@@ -225,13 +206,6 @@ public class GmailFetchService
         if (pendingRecords.Count > 0)
             savedCount += await SaveBatchAsync(pendingRecords, ct);
 
-        // Update SyncState
-        lastSync.TotalMessagesFetched += savedCount;
-        lastSync.LastSyncAt = DateTimeOffset.UtcNow;
-        _dbContext.SyncStates.Update(lastSync);
-        await _dbContext.SaveChangesAsync(ct);
-
-        Console.WriteLine($"Incremental fetch complete. New emails: {savedCount}");
         return savedCount;
     }
 
@@ -282,11 +256,13 @@ public class GmailFetchService
         Action<string>? onStatus,
         CancellationToken ct)
     {
-        // Find emails where Date is suspiciously close to FetchedAt (within 5 minutes)
-        // These are the ones where ParseDateHeader fell back to DateTimeOffset.UtcNow
+        // Suspect dates: null (parse failure), DateTimeOffset.MinValue (legacy fallback),
+        // or suspiciously close to FetchedAt (older legacy fallback to UtcNow).
         var allEmails = await _dbContext.Emails.ToListAsync(ct);
         var suspect = allEmails
-            .Where(e => Math.Abs((e.Date - e.FetchedAt).TotalMinutes) < 5)
+            .Where(e => e.Date is null
+                     || e.Date == DateTimeOffset.MinValue
+                     || Math.Abs((e.Date.Value - e.FetchedAt).TotalMinutes) < 5)
             .ToList();
 
         if (suspect.Count == 0)
@@ -307,7 +283,7 @@ public class GmailFetchService
             try
             {
                 // Minimal fetch — just need InternalDate
-                var getRequest = _gmailService.Users.Messages.Get("me", suspect[i].MessageId);
+                var getRequest = GetGmailService().Users.Messages.Get("me", suspect[i].MessageId);
                 getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Minimal;
 
                 var message = await getRequest.ExecuteAsync(ct);
@@ -347,7 +323,7 @@ public class GmailFetchService
         return repaired;
     }
 
-    private static EmailRecord ParseEmailRecord(Message message)
+    internal static EmailRecord ParseEmailRecord(Message message)
     {
         var headers = message.Payload?.Headers ?? new List<MessagePartHeader>();
         var headerDict = headers.ToDictionary(h => h.Name, h => h.Value, StringComparer.OrdinalIgnoreCase);
@@ -384,14 +360,14 @@ public class GmailFetchService
         };
     }
 
-    private static DateTimeOffset? ParseInternalDate(long? internalDateMs)
+    internal static DateTimeOffset? ParseInternalDate(long? internalDateMs)
     {
         if (internalDateMs is > 0)
             return DateTimeOffset.FromUnixTimeMilliseconds(internalDateMs.Value);
         return null;
     }
 
-    private static string ExtractEmailDomain(string fromHeader)
+    internal static string ExtractEmailDomain(string? fromHeader)
     {
         if (string.IsNullOrWhiteSpace(fromHeader))
             return string.Empty;
@@ -418,10 +394,10 @@ public class GmailFetchService
         }
     }
 
-    private static DateTimeOffset ParseDateHeader(string dateStr)
+    internal static DateTimeOffset? ParseDateHeader(string? dateStr)
     {
         if (string.IsNullOrWhiteSpace(dateStr))
-            return DateTimeOffset.MinValue;
+            return null;
 
         if (DateTimeOffset.TryParse(dateStr, out var result))
             return result;
@@ -445,7 +421,7 @@ public class GmailFetchService
             System.Globalization.DateTimeStyles.AllowWhiteSpaces, out result))
             return result;
 
-        return DateTimeOffset.MinValue;
+        return null;
     }
 
     private static string ExtractCategory(IList<string>? labelIds)

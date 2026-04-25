@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using MailMopper.Config;
+using MailMopper.Data;
 using MailMopper.Services;
 using MailMopper.Tui;
 using Microsoft.EntityFrameworkCore;
@@ -20,28 +22,45 @@ public class RunSettings : CommandSettings
 
 public class RunCommand : AsyncCommand<RunSettings>
 {
+    private readonly GmailServices _gmailServices;
+    private readonly RuleClassifier _ruleClassifier;
+    private readonly ReviewApp _reviewApp;
+    private readonly ActionService _actionService;
+    private readonly AppDbContext _dbContext;
+    private readonly AppSettings _appSettings;
+    private readonly AppCancellation _cancellation;
+
+    public RunCommand(GmailServices gmailServices, RuleClassifier ruleClassifier, ReviewApp reviewApp, ActionService actionService, AppDbContext dbContext, AppSettings appSettings, AppCancellation cancellation)
+    {
+        _gmailServices = gmailServices ?? throw new ArgumentNullException(nameof(gmailServices));
+        _ruleClassifier = ruleClassifier ?? throw new ArgumentNullException(nameof(ruleClassifier));
+        _reviewApp = reviewApp ?? throw new ArgumentNullException(nameof(reviewApp));
+        _actionService = actionService ?? throw new ArgumentNullException(nameof(actionService));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context, RunSettings settings)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]Gmail Cleanup - Full Pipeline[/]");
 
-            var appSettings = CommandHelper.LoadSettings();
-            var authService = new GmailAuthService(appSettings);
-            using var dbContext = CommandHelper.CreateDbContext();
-            await dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // Step 1: Authenticate
             AnsiConsole.MarkupLine("\n[bold]Step 1: Authentication[/]");
-            var gmail = await AnsiConsole.Status()
+            await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await authService.AuthenticateAsync(CancellationToken.None);
+                    await _gmailServices.Auth.AuthenticateAsync(ct);
                 });
 
             // Step 2: Fetch
             AnsiConsole.MarkupLine("\n[bold]Step 2: Fetching Emails[/]");
-            var fetchService = new GmailFetchService(gmail, dbContext, appSettings);
             int totalFetched = 0;
 
             await AnsiConsole.Progress()
@@ -53,41 +72,40 @@ public class RunCommand : AsyncCommand<RunSettings>
                         if (p.total > 0)
                             task.Value = (double)p.fetched / p.total * 100;
                     });
-                    totalFetched = await fetchService.FetchIncrementalAsync(progress, CancellationToken.None);
+                    totalFetched = await _gmailServices.Fetch.FetchIncrementalAsync(progress, ct);
                 });
 
             AnsiConsole.MarkupLine($"[green]✓ Fetched {totalFetched} email(s)[/]");
 
             // Step 3: Classify
             AnsiConsole.MarkupLine("\n[bold]Step 3: Classifying Emails[/]");
-            var ruleClassifier = new RuleClassifier(appSettings);
 
             MlClassifier? mlClassifier = null;
             if (!settings.SkipMl)
             {
-                var modelPath = appSettings.Ml?.ModelPath ?? ModelTrainerService.GetDefaultModelPath();
+                var modelPath = _appSettings.Ml?.ModelPath ?? ModelTrainerService.GetDefaultModelPath();
                 if (File.Exists(modelPath))
-                    mlClassifier = new MlClassifier(appSettings, modelPath);
+                    mlClassifier = new MlClassifier(_appSettings, modelPath);
             }
             using var mlCleanup = mlClassifier; // ensure disposal
 
-            var pipeline = new ClassificationPipeline(ruleClassifier, mlClassifier, dbContext, appSettings);
+            var pipeline = new ClassificationPipeline(_ruleClassifier, mlClassifier, _dbContext, _appSettings);
 
             ClassificationSummary? summary = null;
             Console.WriteLine("Step 2: Classifying emails...");
             summary = await pipeline.RunAsync(
                 settings.SkipMl,
                 onStatus: msg => Console.WriteLine($"  {msg}"),
-                CancellationToken.None);
+                ct);
 
             AnsiConsole.MarkupLine($"[green]✓ Classified {(summary?.RuleClassified ?? 0) + (summary?.MlClassified ?? 0)} email(s)[/]");
 
             // Show classification results
-            var categoryBreakdown = await dbContext.Classifications
+            var categoryBreakdown = await _dbContext.Classifications
                 .GroupBy(c => c.Category)
                 .Select(g => new { Category = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
-                .ToListAsync(CancellationToken.None);
+                .ToListAsync(ct);
 
             var table = new Table();
             table.AddColumn("[bold]Category[/]");
@@ -103,17 +121,16 @@ public class RunCommand : AsyncCommand<RunSettings>
             // Step 4: Review
             AnsiConsole.MarkupLine("\n[bold]Step 4: Review (Interactive)[/]");
             AnsiConsole.MarkupLine("[yellow]Starting review interface...[/]");
-            var reviewApp = new ReviewApp(dbContext);
-            await reviewApp.RunAsync(CancellationToken.None);
+            await _reviewApp.RunAsync(ct);
 
             AnsiConsole.MarkupLine("[green]✓ Review complete![/]");
 
             // Step 5: Execute
             AnsiConsole.MarkupLine("\n[bold]Step 5: Executing Actions[/]");
 
-            var approvedCount = await dbContext.Classifications
+            var approvedCount = await _dbContext.Classifications
                 .Where(c => c.ReviewDecision == Models.ReviewDecision.ApproveTrash)
-                .CountAsync(CancellationToken.None);
+                .CountAsync(ct);
 
             if (approvedCount == 0)
             {
@@ -136,7 +153,6 @@ public class RunCommand : AsyncCommand<RunSettings>
                 return 0;
             }
 
-            var actionService = new ActionService(new GmailApiWrapper(gmail), dbContext, appSettings);
             ActionSummary? actionResult = null;
 
             await AnsiConsole.Progress()
@@ -148,7 +164,7 @@ public class RunCommand : AsyncCommand<RunSettings>
                         if (p.total > 0)
                             task.Value = (double)p.processed / p.total * 100;
                     });
-                    actionResult = await actionService.TrashApprovedAsync(false, progress, CancellationToken.None);
+                    actionResult = await _actionService.TrashApprovedAsync(false, progress, ct);
                 });
 
             AnsiConsole.MarkupLine("[green]✓ Pipeline complete![/]");

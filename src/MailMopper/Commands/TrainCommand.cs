@@ -1,3 +1,4 @@
+using MailMopper.Data;
 using MailMopper.Services;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -6,18 +7,28 @@ namespace MailMopper.Commands;
 
 public class TrainCommand : AsyncCommand
 {
+    private readonly ModelTrainerService _trainer;
+    private readonly AppDbContext _dbContext;
+    private readonly AppCancellation _cancellation;
+
+    public TrainCommand(ModelTrainerService trainer, AppDbContext dbContext, AppCancellation cancellation)
+    {
+        _trainer = trainer ?? throw new ArgumentNullException(nameof(trainer));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context)
     {
         try
         {
+            var ct = _cancellation.Token;
+
             AnsiConsole.MarkupLine("[bold blue]=== Train Email Classifier ===[/]");
             AnsiConsole.WriteLine();
 
-            var appSettings = CommandHelper.LoadSettings();
-            using var dbContext = CommandHelper.CreateDbContext();
-            await dbContext.Database.EnsureCreatedAsync();
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
-            var trainer = new ModelTrainerService(dbContext);
             var modelPath = ModelTrainerService.GetDefaultModelPath();
 
             if (File.Exists(modelPath))
@@ -28,10 +39,10 @@ public class TrainCommand : AsyncCommand
                     return 0;
             }
 
-            var result = await trainer.TrainAsync(
+            var result = await _trainer.TrainAsync(
                 modelPath,
                 onStatus: msg => AnsiConsole.MarkupLine($"  {Markup.Escape(msg)}"),
-                CancellationToken.None);
+                ct);
 
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[green]✓ Training complete![/]");

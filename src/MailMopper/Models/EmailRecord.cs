@@ -13,7 +13,7 @@ public class EmailRecord
     public string To { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Snippet { get; set; } = string.Empty;
-    public DateTimeOffset Date { get; set; }
+    public DateTimeOffset? Date { get; set; }
     public long SizeEstimate { get; set; }
 
     public bool HasListUnsubscribe { get; set; }

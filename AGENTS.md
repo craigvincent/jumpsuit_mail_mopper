@@ -12,13 +12,13 @@ dotnet test
 dotnet run --project src/MailMopper -- <command>
 ```
 
-Commands: `auth`, `fetch`, `classify`, `train`, `review`, `execute`, `stats`, `undo`, `repair-dates`, `run`
+Commands: `auth`, `fetch`, `classify`, `train`, `review`, `execute`, `stats`, `undo`, `repair-dates`, `reset`, `run`
 
 ## Architecture
 
 - **CLI framework**: Spectre.Console.Cli — each command extends `AsyncCommand<TSettings>`
 - **Database**: EF Core 10 + SQLite at `%LOCALAPPDATA%/MailMopper/mail_mopper.db`
-- **No DI container**: Commands instantiate services directly via `CommandHelper` static helpers
+- **DI container**: Commands receive dependencies via constructor injection using Spectre.Console.Cli's `ITypeRegistrar`/`ITypeResolver` pattern wrapping `Microsoft.Extensions.DependencyInjection`. Service registration is in `Program.cs`. Runtime-dependent services (`GmailService`, `MlClassifier`) are still constructed manually after authentication/condition checks.
 - **Gmail abstraction**: `IGmailApi` interface wraps Google.Apis.Gmail.v1 for testability
 - **Classification pipeline**: Rules (priority-ordered) → ML.NET → "Unclassified" fallback
 - **Config loading**: `appsettings.json` → env vars (`MAIL_MOPPER_` prefix), bound to `AppSettings` POCOs

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using MailMopper.Data;
 using MailMopper.Services;
 using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
@@ -15,33 +16,43 @@ public class FetchSettings : CommandSettings
 
 public class FetchCommand : AsyncCommand<FetchSettings>
 {
+    private readonly GmailAuthService _authService;
+    private readonly GmailFetchService _fetchService;
+    private readonly AppDbContext _dbContext;
+    private readonly AppCancellation _cancellation;
+
+    public FetchCommand(GmailAuthService authService, GmailFetchService fetchService, AppDbContext dbContext, AppCancellation cancellation)
+    {
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _fetchService = fetchService ?? throw new ArgumentNullException(nameof(fetchService));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _cancellation = cancellation ?? throw new ArgumentNullException(nameof(cancellation));
+    }
+
     public override async Task<int> ExecuteAsync(CommandContext context, FetchSettings settings)
     {
         try
         {
             AnsiConsole.MarkupLine("[bold blue]Gmail Email Fetch[/]");
 
-            var appSettings = CommandHelper.LoadSettings();
-            var authService = new GmailAuthService(appSettings);
-            using var dbContext = CommandHelper.CreateDbContext();
+            var ct = _cancellation.Token;
 
             // Authenticate
-            var gmail = await AnsiConsole.Status()
+            await AnsiConsole.Status()
                 .StartAsync("Authenticating with Gmail...", async ctx =>
                 {
-                    return await authService.AuthenticateAsync(CancellationToken.None);
+                    await _authService.AuthenticateAsync(ct);
                 });
 
             // Ensure database is created
-            await dbContext.Database.EnsureCreatedAsync();
-            var fetchService = new GmailFetchService(gmail, dbContext, appSettings);
+            await _dbContext.Database.EnsureCreatedAsync(ct);
 
             // Determine fetch strategy
             bool isFullFetch = settings.FullFetch;
             if (!isFullFetch)
             {
-                var lastSync = await dbContext.SyncStates
-                    .FirstOrDefaultAsync(s => s.Key == "default", CancellationToken.None);
+                var lastSync = await _dbContext.SyncStates
+                    .FirstOrDefaultAsync(s => s.Key == "default", cancellationToken: ct);
 
                 isFullFetch = lastSync?.LastSyncAt == null;
             }
@@ -64,8 +75,8 @@ public class FetchCommand : AsyncCommand<FetchSettings>
                             task.Value = (double)p.fetched / p.total * 100;
                     });
                     totalFetched = isFullFetch
-                        ? await fetchService.FetchAllAsync(progress, CancellationToken.None)
-                        : await fetchService.FetchIncrementalAsync(progress, CancellationToken.None);
+                        ? await _fetchService.FetchAllAsync(progress, ct)
+                        : await _fetchService.FetchIncrementalAsync(progress, ct);
                 });
 
             var duration = DateTime.UtcNow - startTime;

@@ -70,7 +70,7 @@ public class ClassificationPipeline
                 classifications.Add(classification);
                 ruleClassified++;
 
-                if (classifications.Count >= 500)
+                if (classifications.Count >= (_settings.Ml?.BatchSize ?? 500))
                 {
                     _db.Classifications.AddRange(classifications);
                     await _db.SaveChangesAsync(ct);
@@ -113,7 +113,7 @@ public class ClassificationPipeline
                     ClassifiedAt = DateTime.UtcNow
                 });
 
-                if (unclassifiedRecords.Count >= 500)
+                if (unclassifiedRecords.Count >= (_settings.Ml?.BatchSize ?? 500))
                 {
                     _db.Classifications.AddRange(unclassifiedRecords);
                     await _db.SaveChangesAsync(ct);
@@ -165,8 +165,6 @@ public class ClassificationPipeline
 
                     onStatus?.Invoke($"Starting ML classification for {remaining.Count} emails");
 
-                    var mlConfidenceThreshold = _settings.Ml?.MinConfidence ?? 0.7;
-
                     await _mlClassifier.ClassifyAllAsync(remaining,
                         onBatchComplete: async (batchResults, processed, total) =>
                         {
@@ -214,8 +212,8 @@ public class ClassificationPipeline
             .Select(g => new { Category = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Category, x => x.Count, ct);
 
-        int classified = ruleClassified + aiClassified;
-        int unclassified = totalEmails - classified;
+        var classified = ruleClassified + aiClassified;
+        var unclassified = Math.Max(0, totalEmails - classified);
 
         return new ClassificationSummary(
             TotalEmails: totalEmails,

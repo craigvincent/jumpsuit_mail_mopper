@@ -28,8 +28,6 @@ public class MlSettings
 public class ClassificationSettings
 {
     public string RulesPath { get; set; } = "rules/default-rules.json";
-    public int NotificationMaxAgeDays { get; set; } = 90;
-    public int TransactionalMaxAgeDays { get; set; } = 365;
 }
 
 public class ActionSettings
