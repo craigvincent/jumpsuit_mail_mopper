@@ -322,7 +322,7 @@ public class GmailFetchService
         return repaired;
     }
 
-    private static EmailRecord ParseEmailRecord(Message message)
+    internal static EmailRecord ParseEmailRecord(Message message)
     {
         var headers = message.Payload?.Headers ?? new List<MessagePartHeader>();
         var headerDict = headers.ToDictionary(h => h.Name, h => h.Value, StringComparer.OrdinalIgnoreCase);
@@ -359,14 +359,14 @@ public class GmailFetchService
         };
     }
 
-    private static DateTimeOffset? ParseInternalDate(long? internalDateMs)
+    internal static DateTimeOffset? ParseInternalDate(long? internalDateMs)
     {
         if (internalDateMs is > 0)
             return DateTimeOffset.FromUnixTimeMilliseconds(internalDateMs.Value);
         return null;
     }
 
-    private static string ExtractEmailDomain(string fromHeader)
+    internal static string ExtractEmailDomain(string? fromHeader)
     {
         if (string.IsNullOrWhiteSpace(fromHeader))
             return string.Empty;
@@ -393,7 +393,7 @@ public class GmailFetchService
         }
     }
 
-    private static DateTimeOffset? ParseDateHeader(string dateStr)
+    internal static DateTimeOffset? ParseDateHeader(string? dateStr)
     {
         if (string.IsNullOrWhiteSpace(dateStr))
             return null;

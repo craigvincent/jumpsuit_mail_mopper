@@ -88,7 +88,7 @@ public class ModelTrainerService
         var model = pipeline.Fit(dataView);
 
         // Save model
-        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(modelPath) ?? ".");
         mlContext.Model.Save(model, dataView.Schema, modelPath);
 
         var fileSize = new FileInfo(modelPath).Length;
