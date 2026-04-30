@@ -185,6 +185,13 @@ public class RuleClassifier
         if (condition.ValueKind == JsonValueKind.Undefined)
             return false;
 
+        // Forwarded/replied emails must not be auto-labelled by subject-pattern rules:
+        // a "Fwd: Your order shipped" from a personal contact is a personal email,
+        // and labelling it Notification would poison the ML training set with mislabelled
+        // forwards (one of the main causes of personal-email misclassification).
+        if (EmailHeuristics.IsForwardOrReply(email.Subject, email.Snippet))
+            return false;
+
         if (condition.TryGetProperty(PatternsPropertyName, out var patternsElement))
         {
             var patterns = patternsElement.EnumerateArray()

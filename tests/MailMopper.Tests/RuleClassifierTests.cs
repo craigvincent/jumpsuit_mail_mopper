@@ -28,6 +28,73 @@ public class RuleClassifierTests : IDisposable
         _classifier.LoadRulesAsync(CancellationToken.None).GetAwaiter().GetResult();
     }
 
+    [Fact]
+    public void ClassifiesGmailPersonalCategoryAsKeep()
+    {
+        var email = MakeEmail(gmailCategory: "CATEGORY_PERSONAL");
+
+        var result = _classifier.Classify(email);
+
+        Assert.NotNull(result);
+        Assert.Equal(ClassificationCategory.Keep, result.Category);
+    }
+
+    [Fact]
+    public void ForwardedNotificationSubject_DoesNotMatchSubjectPatternRule()
+    {
+        // A friend forwards an order shipped notification. Subject contains the
+        // notification trigger phrase "Your order has been shipped" but the email
+        // is personal — must NOT be auto-labelled Notification.
+        var email = MakeEmail(
+            from: "jane.doe@gmail.com",
+            fromDomain: "gmail.com",
+            subject: "Fwd: Your order has been shipped");
+
+        var result = _classifier.Classify(email);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void RepliedNotificationSubject_DoesNotMatchSubjectPatternRule()
+    {
+        var email = MakeEmail(
+            from: "jane.doe@gmail.com",
+            fromDomain: "gmail.com",
+            subject: "Re: Your order has been shipped");
+
+        var result = _classifier.Classify(email);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ForwardedMessageInSnippet_DoesNotMatchSubjectPatternRule()
+    {
+        var rulesJson = """
+        {
+          "rules": [{
+            "name": "subject-test",
+            "type": "subject-pattern",
+            "condition": { "patterns": ["digest"] },
+            "category": "Newsletter",
+            "priority": 1
+          }]
+        }
+        """;
+        var classifier = CreateClassifierWithRules(_tempDir, rulesJson);
+        var email = MakeEmail(
+            from: "friend@gmail.com",
+            fromDomain: "gmail.com",
+            subject: "interesting digest");
+        // Inject snippet via a manually-constructed email since MakeEmail doesn't expose it
+        email.Snippet = "---------- Forwarded message ----------\nFrom: news@example.com";
+
+        var result = classifier.Classify(email);
+
+        Assert.Null(result);
+    }
+
     public void Dispose()
     {
         try

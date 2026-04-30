@@ -127,6 +127,20 @@ Three stages. Like grief, but productive.
 
 The `train` command creates a classifier using your rule-classified emails as training data. Cross-validates and reports per-class precision, recall, and F1. Can be retrained anytime as you review and reclassify more emails.
 
+#### Bootstrap a personalized model
+
+The model gets dramatically smarter once it's seen examples of *your* personal emails (the rules can't infer those — they only catch the obvious junk). Recommended workflow when you first set up the Mop or notice personal emails being mis-tagged as Notification:
+
+```bash
+mopper classify --skip-ml    # rules-only first pass
+mopper review                # mark a handful of personal emails as Keep
+                             # (or whitelist their senders — same effect)
+mopper train                 # retrain — your Keep examples are now in the training set
+mopper classify              # re-run with the smarter model
+```
+
+Every time you mark an email **Keep** or **Whitelist a sender** in the review TUI, that decision is fed back into the next `train` run as a high-confidence personal-email example. Confidence below `Ml.MinConfidence` (default `0.5`, configurable in `appsettings.json`) surfaces the email as Unclassified in the TUI rather than committing to a guess.
+
 ## 💾 Data Storage
 
 All local. I don't trust the cloud and neither should you.
