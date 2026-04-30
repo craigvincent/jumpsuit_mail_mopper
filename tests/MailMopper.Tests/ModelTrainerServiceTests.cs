@@ -174,14 +174,16 @@ public class ModelTrainerServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task BuildTrainingData_PopulatesProviderAgnosticFeatures()
+    public async Task BuildTrainingData_NonGmailProvider_RuleLabelledRowsStillIncluded()
     {
-        // No GmailCategory / no List-Unsubscribe — simulating a POP3/IMAP source.
-        // The row should still be built; Gmail-specific fields just degrade to defaults.
+        // Simulates a POP3/IMAP source where Gmail-specific signals are absent:
+        // no GmailCategory, no List-Unsubscribe. The rule classifier produced a
+        // label some other way (e.g. sender-pattern), and the trainer should still
+        // accept that row with default values for the Gmail-only features.
         _db.Emails.Add(MakeEmail("m1",
             from: "support@vendor.io",
-            subject: "Re: your invoice",
-            snippet: "as discussed"));
+            subject: "your invoice is ready",
+            snippet: "details inside"));
         _db.Classifications.Add(new Classification
         {
             MessageId = "m1",
@@ -192,8 +194,11 @@ public class ModelTrainerServiceTests : IDisposable
 
         var data = await _trainer.BuildTrainingDataAsync(onStatus: null, CancellationToken.None);
 
-        // Re: subject is a reply → excluded by the forward/reply guard.
-        Assert.Empty(data);
+        var row = Assert.Single(data);
+        Assert.Equal(ClassificationCategory.Transactional.ToString(), row.Label);
+        Assert.Equal(string.Empty, row.GmailCategory);
+        Assert.Equal(0f, row.HasListUnsubscribe);
+        Assert.Equal(0f, row.IsForwardedOrReply);
     }
 
     [Fact]

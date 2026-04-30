@@ -175,11 +175,11 @@ public class ModelTrainerService
         // 2. Whitelisted senders → Keep
         var whitelistDomains = await _db.Whitelist
             .Where(w => w.PatternType == "domain")
-            .Select(w => w.Pattern.ToLower(System.Globalization.CultureInfo.InvariantCulture))
+            .Select(w => w.Pattern)
             .ToListAsync(ct);
         var whitelistEmails = await _db.Whitelist
             .Where(w => w.PatternType == "email")
-            .Select(w => w.Pattern.ToLower(System.Globalization.CultureInfo.InvariantCulture))
+            .Select(w => w.Pattern)
             .ToListAsync(ct);
 
         var whitelistDomainSet = new HashSet<string>(whitelistDomains, StringComparer.OrdinalIgnoreCase);
@@ -217,17 +217,13 @@ public class ModelTrainerService
         foreach (var email in whitelistKeepEmails)
             rows[email.MessageId] = MlClassifier.BuildFeature(email, ClassificationCategory.Keep.ToString());
 
-        int humanKeepCount = 0;
         foreach (var c in humanKeep)
-        {
             rows[c.MessageId] = MlClassifier.BuildFeature(c.Email!, ClassificationCategory.Keep.ToString());
-            humanKeepCount++;
-        }
 
         if (whitelistKeepEmails.Count > 0)
             onStatus?.Invoke($"Added {whitelistKeepEmails.Count} whitelisted-sender emails as Keep examples");
-        if (humanKeepCount > 0)
-            onStatus?.Invoke($"Added {humanKeepCount} human-reviewed Keep/Whitelisted emails");
+        if (humanKeep.Count > 0)
+            onStatus?.Invoke($"Added {humanKeep.Count} human-reviewed Keep/Whitelisted emails");
 
         return rows.Values.ToList();
     }

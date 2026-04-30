@@ -10,9 +10,12 @@ namespace MailMopper.Services;
 public static class EmailHeuristics
 {
     // Matches one or more chained reply/forward prefixes at the start of a subject:
-    //   "Re:", "RE:", "Fwd:", "FW:", "Fw:", "Tr:" (French), "[Fwd:", "[Re:" etc.
-    // Also handles the bracketed list-style prefix "[Foo] Re: ..." which we leave alone
-    // (we only strip the conversation prefixes, not the bracket tag).
+    //   "Re:", "RE:", "Fwd:", "FW:", "Fw:", "Tr:" (French), "[Fwd:" / "[Re:" etc.
+    // The optional `[` `]` brackets are intentional: some clients wrap the prefix
+    // itself ("[Re:] subject"). List-style tags like "[my-list] Re: subject" are
+    // matched starting at "Re:" and the "[my-list] " portion is not stripped — the
+    // regex is anchored to ^ but \[? consumes zero chars when the bracketed text
+    // isn't a recognised prefix word.
     private static readonly Regex ReplyForwardPrefix = new(
         @"^\s*(\[?\s*(re|fwd?|fw|tr|aw|sv)\s*\]?\s*:\s*)+",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
