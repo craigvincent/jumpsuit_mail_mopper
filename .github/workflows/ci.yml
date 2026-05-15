@@ -21,6 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Secret scan
+        uses: trufflesecurity/trufflehog-action@v1
+        with:
+          extra_args: --only-verified --fail
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -28,11 +33,6 @@ jobs:
 
       - name: Restore
         run: dotnet restore
-
-      - name: Secret scan
-        uses: trufflesecurity/trufflehog-action@v1
-        with:
-          extra_args: --only-verified --fail
 
       - name: Check formatting
         run: dotnet format --verify-no-changes --verbosity normal
