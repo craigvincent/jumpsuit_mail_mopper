@@ -27,7 +27,7 @@ public sealed class LoopbackCodeReceiver : ICodeReceiver
         var authUri = url.Build().ToString();
 
         using var listener = new HttpListener();
-        listener.Prefixes.Add($"http://+:{_port}/authorize/");
+        listener.Prefixes.Add($"http://localhost:{_port}/authorize/");
         listener.Start();
 
         Console.WriteLine();
@@ -51,10 +51,16 @@ public sealed class LoopbackCodeReceiver : ICodeReceiver
         var queryParams = System.Web.HttpUtility.ParseQueryString(queryString);
         var code = queryParams["code"];
         var error = queryParams["error"];
+        var state = queryParams["state"];
 
         if (!string.IsNullOrEmpty(error))
         {
             return new AuthorizationCodeResponseUrl { Error = error };
+        }
+
+        if (!string.Equals(state, url.State, StringComparison.Ordinal))
+        {
+            return new AuthorizationCodeResponseUrl { Error = "state_mismatch" };
         }
 
         return new AuthorizationCodeResponseUrl { Code = code };

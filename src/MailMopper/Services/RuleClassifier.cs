@@ -248,7 +248,8 @@ public class RuleClassifier
         {
             _compiledRegexCache[pattern] = new Regex(
                 pattern,
-                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                RegexOptions.IgnoreCase | RegexOptions.Compiled,
+                TimeSpan.FromSeconds(1));
         }
         catch (ArgumentException)
         {

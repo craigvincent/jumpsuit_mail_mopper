@@ -1,4 +1,5 @@
 using MailMopper.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace MailMopper.Data;
@@ -30,7 +31,11 @@ public class AppDbContext : DbContext
     {
         if (!optionsBuilder.IsConfigured)
         {
-            optionsBuilder.UseSqlite($"Data Source={_dbPath}");
+            var connectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = _dbPath
+            }.ToString();
+            optionsBuilder.UseSqlite(connectionString);
         }
     }
 
