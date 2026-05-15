@@ -30,11 +30,9 @@ jobs:
         run: dotnet restore
 
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: trufflesecurity/trufflehog-action@v1
         with:
-          fail: true
+          extra_args: --only-verified --fail
 
       - name: Check formatting
         run: dotnet format --verify-no-changes --verbosity normal
