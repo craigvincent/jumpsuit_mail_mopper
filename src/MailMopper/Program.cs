@@ -27,7 +27,7 @@ var appSettings = CommandHelper.LoadSettings();
 services.AddSingleton(appSettings);
 services.AddSingleton(cancellation);
 services.AddSingleton<GmailSession>();
-services.AddSingleton(_ => new AppDbContext());
+services.AddTransient(_ => new AppDbContext());
 services.AddTransient<GmailAuthService>();
 services.AddTransient<RuleClassifier>();
 services.AddTransient<DatabaseService>();
