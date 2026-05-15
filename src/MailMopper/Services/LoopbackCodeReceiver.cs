@@ -13,10 +13,12 @@ namespace MailMopper.Services;
 public sealed class LoopbackCodeReceiver : ICodeReceiver
 {
     private readonly int _port;
+    private readonly Action<string>? _onUrlGenerated;
 
-    public LoopbackCodeReceiver(int port)
+    public LoopbackCodeReceiver(int port, Action<string>? onUrlGenerated = null)
     {
         _port = port;
+        _onUrlGenerated = onUrlGenerated;
     }
 
     public string RedirectUri => $"http://localhost:{_port}/authorize/";
@@ -26,16 +28,21 @@ public sealed class LoopbackCodeReceiver : ICodeReceiver
     {
         var authUri = url.Build().ToString();
 
+        _onUrlGenerated?.Invoke(authUri);
+
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://localhost:{_port}/authorize/");
         listener.Start();
 
-        Console.WriteLine();
-        Console.WriteLine("Open the following URL in your browser to authenticate:");
-        Console.WriteLine();
-        Console.WriteLine($"  {authUri}");
-        Console.WriteLine();
-        Console.WriteLine("Waiting for authorization...");
+        if (_onUrlGenerated == null)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Open the following URL in your browser to authenticate:");
+            Console.WriteLine();
+            Console.WriteLine($"  {authUri}");
+            Console.WriteLine();
+            Console.WriteLine("Waiting for authorization...");
+        }
 
         var context = await listener.GetContextAsync().WaitAsync(taskCancellationToken);
 

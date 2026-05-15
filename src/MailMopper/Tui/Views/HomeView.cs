@@ -1,0 +1,129 @@
+using MailMopper.Data;
+using MailMopper.Services;
+using Spectre.Console;
+using Spectre.Console.Rendering;
+
+namespace MailMopper.Tui.Views;
+
+public sealed class HomeView : IAppView
+{
+    private readonly AppDbContext _db;
+    private readonly DatabaseService _dbService;
+    private readonly GmailSession _session;
+
+    public HomeView(AppDbContext db, DatabaseService dbService, GmailSession session)
+    {
+        _db = db ?? throw new ArgumentNullException(nameof(db));
+        _dbService = dbService ?? throw new ArgumentNullException(nameof(dbService));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+    }
+
+    public IRenderable GetContent(int availableHeight)
+    {
+        var stats = GetStats();
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("")
+            .AddColumn(new TableColumn("Count").RightAligned())
+            .AddColumn("")
+            .HideHeaders();
+
+        table.AddRow("[bold]Total emails[/]", stats.TotalEmails.ToString("N0"), FormatSize(stats.TotalSize));
+        table.AddRow("[bold]Classified[/]", stats.Classified.ToString("N0"), "");
+        table.AddRow("[bold]Unclassified[/]", stats.Unclassified.ToString("N0"), "");
+        table.AddRow("[bold]Approved for trash[/]", stats.ApprovedForTrash.ToString("N0"), "");
+        table.AddRow("[bold]Already trashed[/]", stats.Trashed.ToString("N0"), "");
+
+        var content = new List<IRenderable>
+        {
+            new Markup("[bold blue]Welcome to MailMopper[/]\n").Centered(),
+            new Rule().LeftJustified(),
+            table,
+            new Rule().LeftJustified(),
+        };
+
+        var nextSteps = BuildNextSteps((EmailStats)stats);
+        if (nextSteps.Count > 0)
+        {
+            content.Add(new Markup("\n[bold]Next Steps:[/]"));
+            foreach (var step in nextSteps)
+                content.Add(new Markup($"\n  [blue]→[/] {step}"));
+        }
+
+        content.Add(new Markup($"\n\n[dim]Use number keys 1-6 or Tab to navigate, Q to quit, F1 for help[/]"));
+
+        var rows = new Rows(content);
+        return Align.Center(rows, VerticalAlignment.Middle);
+    }
+
+    public string GetFooterHints() => "[dim]Press a tab number or navigate with Tab key[/]";
+
+    public Task<ViewCommand> HandleInputAsync(ConsoleKeyInfo key, CancellationToken ct)
+    {
+        var upper = char.ToUpperInvariant(key.KeyChar);
+        return Task.FromResult(upper switch
+        {
+            'A' when !_session.IsAuthenticated => ViewCommand.RequestAuth,
+            'F' => ViewCommand.GoToFetch,
+            'C' => ViewCommand.GoToClassify,
+            'R' => ViewCommand.GoToReview,
+            'E' => ViewCommand.GoToExecute,
+            'U' => ViewCommand.GoToUndo,
+            _ => ViewCommand.None
+        });
+    }
+
+    private List<string> BuildNextSteps(EmailStats stats)
+    {
+        var steps = new List<string>();
+
+        if (!_session.IsAuthenticated)
+        {
+            steps.Add("[yellow]Not authenticated[/] — press [bold]A[/] to authenticate with Gmail");
+            return steps;
+        }
+
+        if (stats.TotalEmails == 0)
+            steps.Add("[yellow]No emails fetched[/] — go to [bold]Fetch[/] tab (press 2) to download your emails");
+        else if (stats.Unclassified > 0)
+            steps.Add($"[yellow]{stats.Unclassified:N0} emails need classification[/] — go to [bold]Classify[/] tab (press 3)");
+        else if (stats.Classified - stats.ApprovedForTrash - stats.Trashed > 0)
+            steps.Add($"[yellow]Emails need review decisions[/] — go to [bold]Review[/] tab (press 4)");
+        else if (stats.ApprovedForTrash > 0)
+            steps.Add($"[yellow]{stats.ApprovedForTrash:N0} emails approved for trash[/] — go to [bold]Execute[/] tab (press 5)");
+        else if (stats.TotalEmails > 0)
+            steps.Add("[green]No pending actions![/] Fetch new emails or review the [bold]Stats[/]");
+
+        if (steps.Count == 0 && stats.TotalEmails > 0)
+            steps.Add("[dim]All caught up! Use tabs to explore or configure settings.[/]");
+
+        return steps;
+    }
+
+    private EmailStats GetStats()
+    {
+        try
+        {
+            var totalEmails = _db.Emails.Count();
+            var classified = _db.Classifications.Select(c => c.MessageId).Distinct().Count();
+            var unclassified = totalEmails - classified;
+            var approved = _db.Classifications.Count(c => c.ReviewDecision == Models.ReviewDecision.ApproveTrash);
+            var trashed = _db.Actions.Count(a => a.Action == "trash");
+            var totalSize = _db.Emails.Sum(e => e.SizeEstimate);
+            return new EmailStats(totalEmails, classified, unclassified, approved, trashed, totalSize);
+        }
+        catch
+        {
+            return new EmailStats(0, 0, 0, 0, 0, 0);
+        }
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1_073_741_824 => $"{bytes / 1_073_741_824.0:F1} GB",
+        >= 1_048_576 => $"{bytes / 1_048_576.0:F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F1} KB",
+        _ => $"{bytes} B"
+    };
+}

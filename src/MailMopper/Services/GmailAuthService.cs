@@ -17,7 +17,7 @@ public class GmailAuthService
         _session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
-    public async Task<GmailService> AuthenticateAsync(CancellationToken ct)
+    public async Task<GmailService> AuthenticateAsync(CancellationToken ct, Action<string>? onAuthUrl = null)
     {
         if (!File.Exists(_settings.Gmail.CredentialsPath))
         {
@@ -36,7 +36,7 @@ public class GmailAuthService
             var authCallbackPort = _settings.Gmail.AuthCallbackPort;
             if (authCallbackPort > 0)
             {
-                var receiver = new LoopbackCodeReceiver(authCallbackPort);
+                var receiver = new LoopbackCodeReceiver(authCallbackPort, onAuthUrl);
                 credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                     secrets,
                     _settings.Gmail.Scopes,
