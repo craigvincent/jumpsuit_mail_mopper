@@ -13,6 +13,8 @@ public sealed class FetchView : IAppView
     private readonly AppSettings _settings;
     private readonly GmailSession _session;
 
+    public Action? RequestRender { get; set; }
+
     private enum State { Idle, Running, Complete, Error }
     private State _state = State.Idle;
     private Task? _activeTask;
@@ -182,6 +184,7 @@ public sealed class FetchView : IAppView
         {
             _fetched = p.fetched;
             _total = p.total;
+            RequestRender?.Invoke();
         });
 
         _activeTask = Task.Run(async () =>

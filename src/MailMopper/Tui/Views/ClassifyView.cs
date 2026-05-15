@@ -14,6 +14,8 @@ public sealed class ClassifyView : IAppView
     private readonly ModelTrainerService _trainerService;
     private readonly GmailSession _session;
 
+    public Action? RequestRender { get; set; }
+
     private enum State { Idle, Running, Complete, Error }
     private State _state = State.Idle;
     private Task? _activeTask;
@@ -216,7 +218,7 @@ public sealed class ClassifyView : IAppView
 
                 using var mlCleanup = mlClassifier;
                 var pipeline = new ClassificationPipeline(_ruleClassifier, mlClassifier, _db, _settings);
-                var summary = await pipeline.RunAsync(skipMl, onStatus: msg => _status = msg, token);
+                var summary = await pipeline.RunAsync(skipMl, onStatus: msg => { _status = msg; RequestRender?.Invoke(); }, token);
 
                 _status = $"Classified {summary.RuleClassified + summary.MlClassified} emails ({summary.Unclassified} remaining)";
                 _state = token.IsCancellationRequested ? State.Idle : State.Complete;
@@ -248,7 +250,7 @@ public sealed class ClassifyView : IAppView
         {
             try
             {
-                _lastTrainResult = await _trainerService.TrainAsync(modelPath, onStatus: msg => _status = msg, token);
+                _lastTrainResult = await _trainerService.TrainAsync(modelPath, onStatus: msg => { _status = msg; RequestRender?.Invoke(); }, token);
                 _status = $"Training complete: {_lastTrainResult.TrainingSamples} samples, Accuracy={_lastTrainResult.Accuracy:P1}";
                 _state = token.IsCancellationRequested ? State.Idle : State.Complete;
             }

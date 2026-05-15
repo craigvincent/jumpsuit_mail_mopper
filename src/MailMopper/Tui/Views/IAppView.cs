@@ -15,11 +15,13 @@ public enum ViewCommand
     OpenHelp,
     RequestAuth,
     RequestClassify,
+    RequestLogout,
     MarkDirty,
 }
 
 public interface IAppView
 {
+    Action? RequestRender { get; set; }
     IRenderable GetContent(int availableHeight);
     string GetFooterHints();
     Task<ViewCommand> HandleInputAsync(ConsoleKeyInfo key, CancellationToken ct);

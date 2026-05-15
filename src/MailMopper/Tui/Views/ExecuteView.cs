@@ -15,6 +15,8 @@ public sealed class ExecuteView : IAppView
     private readonly GmailSession _session;
     private readonly GmailAuthService _authService;
 
+    public Action? RequestRender { get; set; }
+
     private enum State { Idle, Preview, Confirm, Running, Complete, Error }
     private State _state = State.Idle;
     private Task? _activeTask;
@@ -294,6 +296,7 @@ public sealed class ExecuteView : IAppView
         {
             _processed = p.processed;
             _total = p.total;
+            RequestRender?.Invoke();
         });
 
         _activeTask = Task.Run(async () =>

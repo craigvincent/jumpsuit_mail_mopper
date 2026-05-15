@@ -12,7 +12,6 @@ public static class HelpView
             .AddColumn("[bold]Key[/]")
             .AddColumn("[bold]Action[/]");
 
-        table.AddRow("[bold]1-6[/]", "Switch to tab");
         table.AddRow("[bold]Tab[/] / [bold]Shift+Tab[/]", "Cycle tabs forward/backward");
         table.AddRow("[bold]Q[/]", "Quit MailMopper");
         table.AddRow("[bold]F1[/] / [bold]?[/]", "Toggle this help screen");

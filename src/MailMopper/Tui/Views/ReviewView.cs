@@ -40,6 +40,8 @@ public sealed class ReviewView : IAppView
     private const int SenderPageSize = 25;
     private const int AutoSaveThreshold = 20;
 
+    public Action? RequestRender { get; set; }
+
     public ReviewView(AppDbContext db)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
@@ -201,7 +203,7 @@ public sealed class ReviewView : IAppView
         _ => $"{bytes} B"
     };
 
-    private void MarkDirty(int count = 1) { _dirty = true; _unsavedActions += count; }
+    private void MarkDirty(int count = 1) { _dirty = true; _unsavedActions += count; RequestRender?.Invoke(); }
 
     private async Task AutoSaveIfNeeded(CancellationToken ct)
     {

@@ -11,6 +11,8 @@ public sealed class HomeView : IAppView
     private readonly DatabaseService _dbService;
     private readonly GmailSession _session;
 
+    public Action? RequestRender { get; set; }
+
     public HomeView(AppDbContext db, DatabaseService dbService, GmailSession session)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
@@ -51,13 +53,18 @@ public sealed class HomeView : IAppView
                 content.Add(new Markup($"\n  [blue]→[/] {step}"));
         }
 
-        content.Add(new Markup($"\n\n[dim]Use number keys 1-6 or Tab to navigate, Q to quit, F1 for help[/]"));
+        content.Add(new Markup($"\n\n[dim]Use Tab/Shift+Tab to navigate, Q to quit, F1 for help[/]"));
 
         var rows = new Rows(content);
         return Align.Center(rows, VerticalAlignment.Middle);
     }
 
-    public string GetFooterHints() => "[dim]Press a tab number or navigate with Tab key[/]";
+    public string GetFooterHints()
+    {
+        return _session.IsAuthenticated
+            ? "A: F:Fetch C:Classify R:Review E:Execute U:Undo L:Logout"
+            : "[dim]A: Authenticate  F:Fetch C:Classify R:Review E:Execute U:Undo[/]";
+    }
 
     public Task<ViewCommand> HandleInputAsync(ConsoleKeyInfo key, CancellationToken ct)
     {
@@ -65,6 +72,7 @@ public sealed class HomeView : IAppView
         return Task.FromResult(upper switch
         {
             'A' when !_session.IsAuthenticated => ViewCommand.RequestAuth,
+            'L' when _session.IsAuthenticated => ViewCommand.RequestLogout,
             'F' => ViewCommand.GoToFetch,
             'C' => ViewCommand.GoToClassify,
             'R' => ViewCommand.GoToReview,
@@ -85,13 +93,13 @@ public sealed class HomeView : IAppView
         }
 
         if (stats.TotalEmails == 0)
-            steps.Add("[yellow]No emails fetched[/] — go to [bold]Fetch[/] tab (press 2) to download your emails");
+            steps.Add("[yellow]No emails fetched[/] — go to [bold]Fetch[/] tab (press F) to download your emails");
         else if (stats.Unclassified > 0)
-            steps.Add($"[yellow]{stats.Unclassified:N0} emails need classification[/] — go to [bold]Classify[/] tab (press 3)");
+            steps.Add($"[yellow]{stats.Unclassified:N0} emails need classification[/] — go to [bold]Classify[/] tab (press C)");
         else if (stats.Classified - stats.ApprovedForTrash - stats.Trashed > 0)
-            steps.Add($"[yellow]Emails need review decisions[/] — go to [bold]Review[/] tab (press 4)");
+            steps.Add($"[yellow]Emails need review decisions[/] — go to [bold]Review[/] tab (press R)");
         else if (stats.ApprovedForTrash > 0)
-            steps.Add($"[yellow]{stats.ApprovedForTrash:N0} emails approved for trash[/] — go to [bold]Execute[/] tab (press 5)");
+            steps.Add($"[yellow]{stats.ApprovedForTrash:N0} emails approved for trash[/] — go to [bold]Execute[/] tab (press E)");
         else if (stats.TotalEmails > 0)
             steps.Add("[green]No pending actions![/] Fetch new emails or review the [bold]Stats[/]");
 

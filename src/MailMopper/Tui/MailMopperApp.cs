@@ -20,6 +20,11 @@ public sealed class MailMopperApp
     private AppTab _currentTab = AppTab.Home;
     private bool _running = true;
     private bool _showHelp;
+    private string _authStatus = "";
+    private string _authUrl = "";
+    private Task? _authTask;
+    private volatile bool _needsRender = true;
+    private DateTime _lastRenderTime = DateTime.MinValue;
 
     private static readonly (AppTab Tab, string Label, string Hotkey)[] _tabs =
     [
@@ -54,6 +59,16 @@ public sealed class MailMopperApp
         _views[(int)AppTab.Review] = reviewView ?? throw new ArgumentNullException(nameof(reviewView));
         _views[(int)AppTab.Execute] = executeView ?? throw new ArgumentNullException(nameof(executeView));
         _views[(int)AppTab.Undo] = undoView ?? throw new ArgumentNullException(nameof(undoView));
+
+        foreach (var view in _views)
+            view.RequestRender = RequestRender;
+    }
+
+    internal void RequestRender()
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _lastRenderTime).TotalMilliseconds >= 1000)
+            _needsRender = true;
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -65,18 +80,54 @@ public sealed class MailMopperApp
             return;
         }
 
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
-        await _db.Database.EnsureCreatedAsync(ct);
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        var capturedOutput = new StringWriter();
+        Console.SetOut(capturedOutput);
+        Console.SetError(capturedOutput);
 
-        while (_running)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            BuildAndRender();
-            var key = Console.ReadKey(intercept: true);
-            await HandleKeyAsync(key, ct);
-        }
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            await _db.Database.EnsureCreatedAsync(ct);
 
-        FinalRender();
+            var authService = new GmailAuthService(_settings, _session);
+            var restored = await authService.TryRestoreSessionAsync(ct);
+            if (restored)
+                _needsRender = true;
+
+            while (_running)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (_needsRender)
+                {
+                    BuildAndRender();
+                    _needsRender = false;
+                    _lastRenderTime = DateTime.UtcNow;
+                }
+
+                var deadline = DateTime.UtcNow.AddMilliseconds(100);
+                while (!_needsRender && !Console.KeyAvailable && DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(16, ct);
+                }
+
+                if (Console.KeyAvailable)
+                {
+                    var key = Console.ReadKey(intercept: true);
+                    _needsRender = true;
+                    await HandleKeyAsync(key, ct);
+                }
+            }
+
+            FinalRender();
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalError);
+        }
     }
 
     private void BuildAndRender()
@@ -118,7 +169,7 @@ public sealed class MailMopperApp
         var tabsLayout = new Layout("Tabs").Size(1);
         tabsLayout.Update(tabs);
 
-        var footerLayout = new Layout("Footer").Size(2);
+        var footerLayout = new Layout("Footer").Size(3);
         footerLayout.Update(footer);
 
         var contentLayout = new Layout("Content");
@@ -137,21 +188,31 @@ public sealed class MailMopperApp
         if (!string.IsNullOrEmpty(_authStatus))
             emailLabel = $"[yellow]⟳ {Markup.Escape(_authStatus)}[/]";
 
-        var grid = new Grid()
-            .AddColumn(new GridColumn().Padding(0, 1))
-            .AddColumn(new GridColumn().Padding(0, 1));
+        var logoLines = new[]
+        {
+            "██▄  ▄██  ▄▄▄  ▄▄ ▄▄      ██▄  ▄██  ▄▄▄  ▄▄▄▄  ▄▄▄▄  ▄▄▄▄▄ ▄▄▄▄  ",
+            "██ ▀▀ ██ ██▀██ ██ ██      ██ ▀▀ ██ ██▀██ ██▄█▀ ██▄█▀ ██▄▄  ██▄█▄ ",
+            "██    ██ ██▀██ ██ ██▄▄▄   ██    ██ ▀███▀ ██    ██    ██▄▄▄ ██ ██ ",
+        };
 
-        grid.AddRow(
-            new Panel(new Markup($"[bold blue]MailMopper[/]")).Border(BoxBorder.None).Padding(new Padding(0, 1)),
-            new Markup($"[dim]{Markup.Escape(userInfo)}  {emailLabel}[/]")
-                .RightJustified());
+        var table = new Table()
+            .HideHeaders()
+            .NoBorder()
+            .Expand()
+            .AddColumn(new TableColumn("L"))
+            .AddColumn(new TableColumn("R").RightAligned());
 
-        grid.AddRow(
-            new Markup(GetStatsLine()).Centered());
+        table.AddRow(
+            new Markup($"[bold blue]{logoLines[0]}[/]"),
+            new Markup(""));
+        table.AddRow(
+            new Markup($"[bold blue]{logoLines[1]}[/]"),
+            new Markup($"[dim]{Markup.Escape(userInfo)}  {emailLabel}[/]"));
+        table.AddRow(
+            new Markup($"[bold blue]{logoLines[2]}[/]"),
+            new Markup(GetStatsLine()));
 
-        return new Panel(grid)
-            .Border(BoxBorder.Rounded)
-            .Padding(new Padding(0, 1));
+        return new Rows(table, new Rule());
     }
 
     private string GetUserEmail()
@@ -191,9 +252,9 @@ public sealed class MailMopperApp
         foreach (var (tab, label, hotkey) in _tabs)
         {
             var isActive = tab == _currentTab;
-            var prefix = isActive ? "[bold black on blue]" : "[dim]";
-            var suffix = isActive ? "[/]" : "[/]";
-            cols.Add(new Markup($"{prefix} [[{hotkey}]] {label} {suffix}"));
+            var style = isActive ? "[bold invert]" : "[dim]";
+            var suffix = "[/]";
+            cols.Add(new Markup($"{style} [[{hotkey}]] {label} {suffix}"));
         }
         return new Columns(cols).Padding(1, 1).Expand();
     }
@@ -224,35 +285,34 @@ public sealed class MailMopperApp
             return HelpView.GetContent();
 
         var view = _views[(int)_currentTab];
-        var contentHeight = Console.WindowHeight - 7;
+        var contentHeight = Console.WindowHeight - 8;
         return view.GetContent(contentHeight);
     }
 
     private IRenderable BuildFooter()
     {
-        var hints = new List<string> { "[bold]1-6[/]:Tabs", "[bold]Tab[/]/[bold]Shift+Tab[/]:Cycle", "[bold]Q[/]:Quit", "[bold]F1[/]:Help" };
+        var hints = new List<string> { "[bold]Tab[/]/[bold]Shift+Tab[/]:Cycle tabs", "[bold]Q[/]:Quit", "[bold]F1[/]:Help" };
 
         var view = _views[(int)_currentTab];
         var viewHints = view.GetFooterHints();
+
+        var rows = new List<IRenderable>
+        {
+            new Rule(),
+            new Markup($"[dim]{string.Join("  │  ", hints)}[/]"),
+        };
+
         if (!string.IsNullOrEmpty(viewHints))
-            hints.Add(viewHints);
+            rows.Add(new Markup($"[dim]{viewHints}[/]"));
 
-        var grid = new Grid()
-            .AddColumn(new GridColumn().Padding(0, 1));
-
-        grid.AddRow(new Markup(string.Join("  │  ", hints.Select(h => $"[dim]{h}[/]"))).Centered());
-        grid.AddRow(new Markup(viewHints).Centered());
-
-        return new Panel(grid)
-            .Border(BoxBorder.Rounded)
-            .Padding(new Padding(0, 1));
+        return new Rows(rows);
     }
 
     private async Task HandleKeyAsync(ConsoleKeyInfo key, CancellationToken ct)
     {
         if (_showHelp)
         {
-            if (key.Key is ConsoleKey.F1 or ConsoleKey.Oem2 || key.KeyChar is '?' or '/')
+            if (key.Key is ConsoleKey.F1 || key.KeyChar is '?' or '/')
             {
                 _showHelp = false;
                 return;
@@ -269,24 +329,6 @@ public sealed class MailMopperApp
 
         switch (key.Key)
         {
-            case ConsoleKey.D1 or ConsoleKey.NumPad1:
-                _currentTab = AppTab.Home;
-                return;
-            case ConsoleKey.D2 or ConsoleKey.NumPad2:
-                _currentTab = AppTab.Fetch;
-                return;
-            case ConsoleKey.D3 or ConsoleKey.NumPad3:
-                _currentTab = AppTab.Classify;
-                return;
-            case ConsoleKey.D4 or ConsoleKey.NumPad4:
-                _currentTab = AppTab.Review;
-                return;
-            case ConsoleKey.D5 or ConsoleKey.NumPad5:
-                _currentTab = AppTab.Execute;
-                return;
-            case ConsoleKey.D6 or ConsoleKey.NumPad6:
-                _currentTab = AppTab.Undo;
-                return;
             case ConsoleKey.Tab:
                 _currentTab = key.Modifiers.HasFlag(ConsoleModifiers.Shift)
                     ? PreviousTab()
@@ -332,6 +374,9 @@ public sealed class MailMopperApp
             case ViewCommand.RequestAuth:
                 await HandleAuthAsync(ct);
                 break;
+            case ViewCommand.RequestLogout:
+                HandleLogout();
+                break;
             case ViewCommand.RequestClassify:
                 _currentTab = AppTab.Classify;
                 break;
@@ -340,10 +385,6 @@ public sealed class MailMopperApp
         }
     }
 
-    private string _authStatus = "";
-    private string _authUrl = "";
-    private Task? _authTask;
-
     private async Task HandleAuthAsync(CancellationToken ct)
     {
         if (_authTask != null && !_authTask.IsCompleted)
@@ -351,6 +392,7 @@ public sealed class MailMopperApp
 
         _authUrl = "";
         _authStatus = "Generating authentication URL...";
+        _needsRender = true;
         var authService = new GmailAuthService(_settings, _session);
 
         _authTask = Task.Run(async () =>
@@ -361,18 +403,29 @@ public sealed class MailMopperApp
                 {
                     _authUrl = url;
                     _authStatus = "Authentication in progress — open the URL below in your browser:";
+                    _needsRender = true;
                 });
                 _authStatus = "[green]✓ Authenticated![/]";
                 _authUrl = "";
+                _needsRender = true;
             }
             catch (Exception ex)
             {
                 _authStatus = $"[red]Auth failed: {ex.Message}[/]";
                 _authUrl = "";
+                _needsRender = true;
             }
             await Task.Delay(2000, ct);
             _authStatus = "";
+            _needsRender = true;
         }, ct);
+    }
+
+    private void HandleLogout()
+    {
+        var authService = new GmailAuthService(_settings, _session);
+        authService.Logout();
+        _needsRender = true;
     }
 
     private AppTab NextTab()
