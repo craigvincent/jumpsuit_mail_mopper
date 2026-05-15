@@ -17,6 +17,39 @@ public class GmailAuthService
         _session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
+    public async Task<bool> TryRestoreSessionAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (!File.Exists(_settings.Gmail.CredentialsPath))
+                return false;
+
+            var tokenPath = Path.Combine(_settings.Gmail.TokenPath, "Google.Apis.Auth.OAuth2.Responses.TokenResponse-user");
+            if (!File.Exists(tokenPath))
+                return false;
+
+            await AuthenticateAsync(ct);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public void Logout()
+    {
+        _session.Service?.Dispose();
+        _session.Service = null;
+
+        var tokenDir = _settings.Gmail.TokenPath;
+        if (Directory.Exists(tokenDir))
+        {
+            foreach (var file in Directory.GetFiles(tokenDir))
+                File.Delete(file);
+        }
+    }
+
     public async Task<GmailService> AuthenticateAsync(CancellationToken ct, Action<string>? onAuthUrl = null)
     {
         if (!File.Exists(_settings.Gmail.CredentialsPath))
