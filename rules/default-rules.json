@@ -1,6 +1,16 @@
 {
   "rules": [
     {
+      "name": "gmail-personal",
+      "description": "Gmail's Primary/Personal category — these are real personal emails, mark as Keep",
+      "type": "gmail-category",
+      "condition": {
+        "category": "CATEGORY_PERSONAL"
+      },
+      "category": "Keep",
+      "priority": 5
+    },
+    {
       "name": "list-unsubscribe-header",
       "description": "Emails with List-Unsubscribe header are marketing/newsletters",
       "type": "header",

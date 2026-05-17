@@ -12,13 +12,13 @@ Each rule in the `rules` array must have these fields:
 | `description` | string | yes | Human-readable explanation of what this rule matches |
 | `type` | string | yes | One of: `header`, `gmail-category`, `sender-domain`, `sender-pattern`, `subject-pattern` |
 | `condition` | object | yes | Type-specific (see below) |
-| `category` | string | yes | One of: `Newsletter`, `Marketing`, `Social`, `Notification`, `Forum`, `Automated` |
+| `category` | string | yes | One of: `Keep`, `Newsletter`, `Marketing`, `Social`, `Notification`, `Forum`, `Automated`, `Transactional`, `Spam` |
 | `priority` | number | yes | Lower = higher precedence. Use 10-20 for high-confidence, 30-40 for medium, 50+ for pattern-based |
 
 ## Condition schemas by type
 
 - **`header`**: `{ "header": "<name>", "present": true }`
-- **`gmail-category`**: `{ "category": "CATEGORY_PROMOTIONS" | "CATEGORY_SOCIAL" | "CATEGORY_UPDATES" | "CATEGORY_FORUMS" }`
+- **`gmail-category`**: `{ "category": "CATEGORY_PERSONAL" | "CATEGORY_PROMOTIONS" | "CATEGORY_SOCIAL" | "CATEGORY_UPDATES" | "CATEGORY_FORUMS" }`
 - **`sender-domain`**: `{ "domains": ["domain1.com", "domain2.com"] }`
 - **`sender-pattern`**: `{ "patterns": ["^regex1@", "^regex2@"] }` — matched against the From address
 - **`subject-pattern`**: `{ "patterns": ["regex1", "regex2"] }` — matched against the Subject line
